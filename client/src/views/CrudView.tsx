@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import type { FieldDefinition, ModelDefinition, Record as ModelRecord } from '@modeler/shared';
+import type { ModelDefinition, Record as ModelRecord } from '@modeler/shared';
 import type { ApiClient } from '../services/api.js';
+import { FieldInput } from '../components/FieldInput.js';
 import { useCrudViewModel } from '../viewmodels/useCrudViewModel.js';
 
 /**
@@ -109,42 +110,3 @@ function renderValue(v: unknown): string {
   return String(v);
 }
 
-/**
- * フィールドの型に応じて適切な input を出す小コンポーネント。
- * ここを 1 箇所にまとめておくと、サポート型を追加するときの修正範囲が最小になる。
- */
-function FieldInput({
-  field,
-  value,
-  onChange,
-}: {
-  field: FieldDefinition;
-  value: unknown;
-  onChange: (v: unknown) => void;
-}) {
-  const common = { placeholder: field.label } as const;
-  switch (field.type) {
-    case 'string':
-      return (
-        <input type="text" {...common} value={(value as string) ?? ''}
-          onChange={(e) => onChange(e.target.value)} />
-      );
-    case 'number':
-      return (
-        <input type="number" {...common} value={(value as number | '') ?? ''}
-          onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))} />
-      );
-    case 'date':
-      return (
-        <input type="date" {...common} value={(value as string) ?? ''}
-          onChange={(e) => onChange(e.target.value)} />
-      );
-    case 'boolean':
-      return (
-        <label>
-          <input type="checkbox" checked={Boolean(value)}
-            onChange={(e) => onChange(e.target.checked)} /> {field.label}
-        </label>
-      );
-  }
-}

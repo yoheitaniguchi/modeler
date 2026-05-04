@@ -167,12 +167,13 @@ export function ModelDesignerView({ api }: { api: ApiClient }) {
           <table style={{ marginTop: '0.6rem', fontSize: '0.9rem' }}>
             <thead>
               <tr>
-                <th style={{ width: '18%' }}>name</th>
-                <th style={{ width: '18%' }}>label</th>
-                <th style={{ width: '16%' }}>type</th>
-                <th style={{ width: '12%' }}>必須</th>
-                <th style={{ width: '22%' }}>デフォルト値</th>
-                <th style={{ width: '8%' }}></th>
+                <th style={{ width: '16%' }}>name</th>
+                <th style={{ width: '16%' }}>label</th>
+                <th style={{ width: '14%' }}>type</th>
+                <th style={{ width: '10%' }}>必須</th>
+                <th style={{ width: '20%' }}>デフォルト値</th>
+                <th style={{ width: '18%' }}>optionsUrl</th>
+                <th style={{ width: '6%' }}></th>
               </tr>
             </thead>
             <tbody>
@@ -199,7 +200,14 @@ export function ModelDesignerView({ api }: { api: ApiClient }) {
                   <td>
                     <select
                       value={field.type}
-                      onChange={(e) => vm.updateField(mi, fi, { type: e.target.value as FieldType })}
+                      onChange={(e) => {
+                        const newType = e.target.value as FieldType;
+                        // type が string 以外に変わった場合、optionsUrl をクリア
+                        vm.updateField(mi, fi, {
+                          type: newType,
+                          optionsUrl: newType === 'string' ? field.optionsUrl : undefined,
+                        });
+                      }}
                       style={{ fontSize: '0.9rem' }}
                     >
                       {FIELD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -217,6 +225,19 @@ export function ModelDesignerView({ api }: { api: ApiClient }) {
                       field={field}
                       onChange={(v) => vm.updateField(mi, fi, { defaultValue: v })}
                     />
+                  </td>
+                  <td>
+                    {field.type === 'string' ? (
+                      <input
+                        type="text"
+                        value={field.optionsUrl ?? ''}
+                        placeholder="/api/categories"
+                        onChange={(e) => vm.updateField(mi, fi, { optionsUrl: e.target.value || undefined })}
+                        style={{ fontSize: '0.9rem' }}
+                      />
+                    ) : (
+                      <span className="muted" style={{ fontSize: '0.8rem' }}>(string型のみ)</span>
+                    )}
                   </td>
                   <td style={{ textAlign: 'center' }}>
                     <button
