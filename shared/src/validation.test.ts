@@ -101,6 +101,73 @@ describe('validateDocument', () => {
     };
     expect(validateDocument(goodDefault)).toEqual({ ok: true });
   });
+
+  it('optionsUrl が有効な URL 文字列なら OK', () => {
+    const withOptions: ModelDefinitionDocument = {
+      version: 1,
+      models: [
+        {
+          name: 'item',
+          label: 'アイテム',
+          fields: [
+            { name: 'category', label: 'カテゴリ', type: 'string', required: false, optionsUrl: '/api/categories' },
+          ],
+        },
+      ],
+    };
+    expect(validateDocument(withOptions)).toEqual({ ok: true });
+  });
+
+  it('optionsUrl が空文字列なら失敗', () => {
+    const badOptions: ModelDefinitionDocument = {
+      version: 1,
+      models: [
+        {
+          name: 'item',
+          label: 'アイテム',
+          fields: [{ name: 'category', label: 'カテゴリ', type: 'string', required: false, optionsUrl: '' }],
+        },
+      ],
+    };
+    const result = validateDocument(badOptions);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.some((e) => e.includes('optionsUrl'))).toBe(true);
+    }
+  });
+
+  it('optionsUrl が number フィールドに指定されると失敗', () => {
+    const badType: ModelDefinitionDocument = {
+      version: 1,
+      models: [
+        {
+          name: 'item',
+          label: 'アイテム',
+          fields: [{ name: 'quantity', label: '数量', type: 'number', required: false, optionsUrl: '/api/qty' }],
+        },
+      ],
+    };
+    const result = validateDocument(badType);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.some((e) => e.includes('optionsUrl'))).toBe(true);
+    }
+  });
+
+  it('ModelUiConfig があっても validateDocument は通る', () => {
+    const withUi: ModelDefinitionDocument = {
+      version: 1,
+      models: [
+        {
+          name: 'order',
+          label: '注文',
+          ui: { listTitle: '注文一覧', detailTitle: '注文詳細', createButtonLabel: '新規作成' },
+          fields: [{ name: 'status', label: 'ステータス', type: 'string', required: true }],
+        },
+      ],
+    };
+    expect(validateDocument(withUi)).toEqual({ ok: true });
+  });
 });
 
 describe('validateRecord', () => {

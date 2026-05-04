@@ -52,6 +52,15 @@ export function validateFieldDefinition(field: unknown, path: string): string[] 
     if (err) errors.push(`${path}.defaultValue: ${err}`);
   }
 
+  // optionsUrl が指定されていれば、type==='string' のみ許可
+  if (f.optionsUrl !== undefined) {
+    if (typeof f.optionsUrl !== 'string' || f.optionsUrl.trim() === '') {
+      errors.push(`${path}.optionsUrl: must be non-empty string when provided`);
+    } else if (f.type !== 'string') {
+      errors.push(`${path}.optionsUrl: only valid when type is "string"`);
+    }
+  }
+
   return errors;
 }
 

@@ -26,6 +26,24 @@ export interface FieldDefinition {
   required: boolean;
   /** デフォルト値。新規作成時にこの値で埋める。型に応じた値、または undefined/null で「値なし」。 */
   defaultValue?: unknown;
+  /** type='string' フィールドの場合、selectbox の選択肢を取得する API エンドポイント。 */
+  optionsUrl?: string;
+}
+
+/** モデル単位での UI 設定。 */
+export interface ModelUiConfig {
+  /** 一覧画面のタイトル。未設定ならモデル.label を使う。 */
+  listTitle?: string;
+  /** 詳細/編集画面のタイトル。 */
+  detailTitle?: string;
+  /** 作成ボタンのラベル。 */
+  createButtonLabel?: string;
+  /** 保存ボタンのラベル。 */
+  saveButtonLabel?: string;
+  /** キャンセルボタンのラベル。 */
+  cancelButtonLabel?: string;
+  /** 検索ボタンのラベル。 */
+  searchButtonLabel?: string;
 }
 
 /** 1 つのモデル (テーブル相当) の定義。 */
@@ -36,6 +54,8 @@ export interface ModelDefinition {
   label: string;
   /** フィールド一覧。順序は UI の表示順序に使う。 */
   fields: FieldDefinition[];
+  /** モデル単位での UI 設定。 */
+  ui?: ModelUiConfig;
 }
 
 /**
