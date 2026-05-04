@@ -1,1 +1,14 @@
+# Dependencies / build artifacts
+node_modules/
+dist/
+*.log
+
+# OS / editor
+.DS_Store
+.vscode/
+
+# Runtime data store (persisted CRUD records — generated at runtime, never commit)
+server/data/
+
+# Local Claude config
 .claude/settings.json
