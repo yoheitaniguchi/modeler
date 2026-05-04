@@ -21,6 +21,10 @@ export function createFakeApi(): ApiClient & { _store: Map<string, ModelRecord[]
       return { deployed: models };
     },
     async listModels() { return models; },
+    async deleteModel(name) {
+      models = models.filter((m) => m.name !== name);
+      store.delete(name);
+    },
     async list(name) { return store.get(name) ?? []; },
     async create(name, body) {
       const record: ModelRecord = { id: nextId(), ...body };

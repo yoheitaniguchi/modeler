@@ -21,6 +21,8 @@ import { createCrudRouter } from '../routes/crudRouter.js';
 export class DeployRegistry {
   private current: Router = express.Router();
   private deployed: ModelDefinition[] = [];
+  /** 各モデル名に対する Router を保持。DAO の再初期化を避けるため。 */
+  private routerMap = new Map<string, Router>();
 
   /** Express にマウントする入口。一度マウントすれば以後の差し替えは自動反映。 */
   attach(app: Express, basePath: string): void {
@@ -44,20 +46,49 @@ export class DeployRegistry {
       throw new DeployError(validation.errors);
     }
 
+    // 新しい Router を作成し、各モデルのルートを登録
     const next = express.Router();
+    const newRouterMap = new Map<string, Router>();
+
     // 各 DAO の init() を待ってからスイッチすることで、
     // 半端な状態でリクエストが届くのを避ける。
     await Promise.all(
       doc.models.map(async (model) => {
         const { router, ready } = createCrudRouter(model, dataDir);
         await ready;
+        newRouterMap.set(model.name, router);
         next.use(`/${model.name}`, router);
       }),
     );
 
     this.current = next;
     this.deployed = doc.models;
+    this.routerMap = newRouterMap;
     return { deployed: this.list() };
+  }
+
+  /**
+   * デプロイ済みモデルを 1 つ削除する。
+   * routerMap から削除し、残りモデルで this.current を再構築する。
+   * データファイルは残す。
+   */
+  removeModel(name: string): boolean {
+    const idx = this.deployed.findIndex((m) => m.name === name);
+    if (idx === -1) return false;
+
+    this.deployed = this.deployed.filter((_, i) => i !== idx);
+    this.routerMap.delete(name);
+
+    // 残りモデルの Router から新しい current を構築
+    const next = express.Router();
+    for (const model of this.deployed) {
+      const router = this.routerMap.get(model.name);
+      if (router) {
+        next.use(`/${model.name}`, router);
+      }
+    }
+    this.current = next;
+    return true;
   }
 }
 

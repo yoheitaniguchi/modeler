@@ -16,6 +16,7 @@ import type { ModelDefinition, ModelDefinitionDocument, Record as ModelRecord } 
 export interface ApiClient {
   deploy(doc: ModelDefinitionDocument): Promise<{ deployed: ModelDefinition[] }>;
   listModels(): Promise<ModelDefinition[]>;
+  deleteModel(name: string): Promise<void>;
   list(modelName: string): Promise<ModelRecord[]>;
   create(modelName: string, body: Record<string, unknown>): Promise<ModelRecord>;
   update(modelName: string, id: string, body: Record<string, unknown>): Promise<ModelRecord>;
@@ -31,6 +32,9 @@ export class HttpApiClient implements ApiClient {
   async listModels() {
     const res = await this.request<{ models: ModelDefinition[] }>('GET', '/meta/models');
     return res.models;
+  }
+  async deleteModel(name: string) {
+    await this.request<void>('DELETE', `/meta/models/${name}`);
   }
   async list(modelName: string) {
     return this.request<ModelRecord[]>('GET', `/api/${modelName}`);

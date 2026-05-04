@@ -53,6 +53,12 @@ export function createApp(options: AppOptions = {}): {
     }
   });
 
+  // メタ API: デプロイ済みモデルを削除
+  app.delete('/meta/models/:name', (_req, res) => {
+    const removed = registry.removeModel(_req.params.name);
+    res.status(removed ? 204 : 404).end();
+  });
+
   // ヘルスチェック (環境構築テスト用)
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });

@@ -125,4 +125,38 @@ describe('app', () => {
     expect(res.body.models).toHaveLength(1);
     expect(res.body.models[0].name).toBe('customer');
   });
+
+  it('DELETE /meta/models/:name で model を削除できる', async () => {
+    // deploy
+    await request(app).post('/meta/deploy').send(document);
+    expect((await request(app).get('/meta/models')).body.models).toHaveLength(1);
+
+    // delete
+    const del = await request(app).delete('/meta/models/customer');
+    expect(del.status).toBe(204);
+
+    // その後 get は 404
+    expect((await request(app).get('/api/customer')).status).toBe(404);
+
+    // /meta/models にも含まれない
+    expect((await request(app).get('/meta/models')).body.models).toHaveLength(0);
+  });
+
+  it('DELETE で存在しないモデル指定は 404', async () => {
+    const res = await request(app).delete('/meta/models/nonexistent');
+    expect(res.status).toBe(404);
+  });
+
+  it('DELETE 後もデータファイルは残る', async () => {
+    // deploy して create
+    await request(app).post('/meta/deploy').send(document);
+    await request(app).post('/api/customer').send({ name: '太郎', age: 30 });
+
+    // delete model
+    await request(app).delete('/meta/models/customer');
+
+    // ファイルがまだあることを確認（dataDir を見てチェック）
+    const file = await fs.stat(path.join(dataDir, 'customer.json'));
+    expect(file.isFile()).toBe(true);
+  });
 });
