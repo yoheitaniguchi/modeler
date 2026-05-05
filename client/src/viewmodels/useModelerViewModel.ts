@@ -28,6 +28,7 @@ export interface ModelerViewModel {
   addModel: () => void;
   removeModel: (index: number) => void;
   updateModel: (index: number, patch: Partial<ModelDefinition>) => void;
+  replaceModel: (index: number, next: ModelDefinition) => void;
 
   addField: (modelIndex: number) => void;
   removeField: (modelIndex: number, fieldIndex: number) => void;
@@ -82,6 +83,13 @@ export function useModelerViewModel(api: ApiClient): ModelerViewModel {
   const updateModel = useCallback(
     (index: number, patch: Partial<ModelDefinition>) => {
       updateModels((m) => m.map((model, i) => (i === index ? { ...model, ...patch } : model)));
+    },
+    [updateModels],
+  );
+
+  const replaceModel = useCallback(
+    (index: number, next: ModelDefinition) => {
+      updateModels((m) => m.map((model, i) => (i === index ? next : model)));
     },
     [updateModels],
   );
@@ -185,6 +193,7 @@ export function useModelerViewModel(api: ApiClient): ModelerViewModel {
     addModel,
     removeModel,
     updateModel,
+    replaceModel,
     addField,
     removeField,
     updateField,

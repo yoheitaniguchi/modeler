@@ -1,16 +1,33 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ModelDefinition } from '@modeler/shared';
 import type { ApiClient } from '../services/api.js';
+import { ApiError } from '../services/api.js';
 import { CrudView } from './CrudView.js';
+import { InlineModelEditor } from '../components/InlineModelEditor.js';
+import { ConfirmDialog } from '../components/ConfirmDialog.js';
 
 /**
  * デプロイ済みモデルの一覧 → 選択 → CRUD 画面表示。
- * 「設計」と「実データ操作」の責務を分離するため別 View に切り出す。
+ *
+ * + デプロイ済みモデルの「定義編集 (再デプロイ)」「削除」をここから直接行えるようにする。
  */
 export function DeployedModelsView({ api }: { api: ApiClient }) {
   const [models, setModels] = useState<ModelDefinition[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<boolean>(false);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [editErrors, setEditErrors] = useState<string[]>([]);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    try {
+      const m = await api.listModels();
+      setModels(m);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, [api]);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,21 +51,81 @@ export function DeployedModelsView({ api }: { api: ApiClient }) {
 
   const current = models.find((m) => m.name === selected);
 
+  const onSaveEdit = async (next: ModelDefinition) => {
+    if (!current) return;
+    setSaving(true);
+    setEditErrors([]);
+    try {
+      await api.updateModel(current.name, next);
+      await reload();
+      setEditing(false);
+    } catch (e) {
+      setEditErrors(e instanceof ApiError ? e.toMessages() : [String(e)]);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const onConfirmDelete = async () => {
+    if (!deleteConfirm) return;
+    try {
+      await api.deleteModel(deleteConfirm);
+      if (selected === deleteConfirm) setSelected(null);
+      setDeleteConfirm(null);
+      await reload();
+    } catch (e) {
+      setError(String(e));
+      setDeleteConfirm(null);
+    }
+  };
+
   return (
     <section>
       <div className="row" style={{ marginBottom: '1rem' }}>
         <label>モデル <select
           value={selected ?? ''}
-          onChange={(e) => setSelected(e.target.value || null)}
+          onChange={(e) => {
+            setSelected(e.target.value || null);
+            setEditing(false);
+          }}
+          data-testid="model-select"
         >
           <option value="">選択してください</option>
           {models.map((m) => (
             <option key={m.name} value={m.name}>{m.label} ({m.name})</option>
           ))}
         </select></label>
+        {current && !editing && (
+          <>
+            <button className="ghost" onClick={() => { setEditing(true); setEditErrors([]); }} data-testid="edit-deployed">
+              定義を編集
+            </button>
+            <button className="danger" onClick={() => setDeleteConfirm(current.name)} data-testid="delete-deployed">
+              モデルを削除
+            </button>
+          </>
+        )}
       </div>
 
-      {current && <CrudView api={api} model={current} />}
+      {current && editing && (
+        <InlineModelEditor
+          initial={current}
+          onSave={onSaveEdit}
+          onCancel={() => { setEditing(false); setEditErrors([]); }}
+          saving={saving}
+          errors={editErrors}
+        />
+      )}
+
+      {current && !editing && <CrudView api={api} model={current} />}
+
+      <ConfirmDialog
+        open={deleteConfirm !== null}
+        message={`モデル「${deleteConfirm}」を削除します。\nAPI エンドポイントは即時無効化されます (データファイルは残ります)。`}
+        okLabel="削除"
+        onOk={onConfirmDelete}
+        onCancel={() => setDeleteConfirm(null)}
+      />
     </section>
   );
 }

@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  unit:
+    name: Unit & Integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build --workspace=shared
+      - run: npm run test --workspace=shared
+      - run: npm run test --workspace=server
+      - run: npm run test --workspace=client
+
+  e2e:
+    name: Playwright E2E (${{ matrix.browser }})
+    needs: unit
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build --workspace=shared
+      - name: Install Playwright browsers
+        run: npx --workspace=e2e playwright install --with-deps ${{ matrix.browser }}
+      - name: Run E2E
+        run: npx --workspace=e2e playwright test --project=${{ matrix.browser }}
+      - name: Upload report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.browser }}
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+          retention-days: 7

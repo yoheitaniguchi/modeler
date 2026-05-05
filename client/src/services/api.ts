@@ -13,14 +13,32 @@ import type { ModelDefinition, ModelDefinitionDocument, Record as ModelRecord } 
  *   依存性逆転 (Dependency Inversion) — UI が抽象に依存し、実装は外から差す。
  */
 
+/** カスタムボタン経由で任意 URL を呼び出すための呼び出し情報。 */
+export interface CallButtonRequest {
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  url: string;
+  /** すでに展開済みの JSON ボディ。空なら body を送らない。 */
+  body?: unknown;
+}
+
+export interface CallButtonResponse {
+  status: number;
+  ok: boolean;
+  /** レスポンス本文を JSON としてパースしたもの。失敗時は string で。 */
+  data: unknown;
+}
+
 export interface ApiClient {
   deploy(doc: ModelDefinitionDocument): Promise<{ deployed: ModelDefinition[] }>;
   listModels(): Promise<ModelDefinition[]>;
+  updateModel(name: string, model: ModelDefinition): Promise<ModelDefinition>;
   deleteModel(name: string): Promise<void>;
   list(modelName: string): Promise<ModelRecord[]>;
   create(modelName: string, body: Record<string, unknown>): Promise<ModelRecord>;
   update(modelName: string, id: string, body: Record<string, unknown>): Promise<ModelRecord>;
   remove(modelName: string, id: string): Promise<void>;
+  /** カスタムボタンから任意 URL を呼ぶ。 */
+  callCustom(req: CallButtonRequest): Promise<CallButtonResponse>;
 }
 
 export class HttpApiClient implements ApiClient {
@@ -33,8 +51,33 @@ export class HttpApiClient implements ApiClient {
     const res = await this.request<{ models: ModelDefinition[] }>('GET', '/meta/models');
     return res.models;
   }
+  async updateModel(name: string, model: ModelDefinition) {
+    const res = await this.request<{ model: ModelDefinition }>(
+      'PUT',
+      `/meta/models/${name}`,
+      model,
+    );
+    return res.model;
+  }
   async deleteModel(name: string) {
     await this.request<void>('DELETE', `/meta/models/${name}`);
+  }
+  async callCustom(req: CallButtonRequest): Promise<CallButtonResponse> {
+    const headers: Record<string, string> =
+      req.body !== undefined ? { 'Content-Type': 'application/json' } : {};
+    const res = await fetch(`${this.baseUrl}${req.url}`, {
+      method: req.method,
+      headers,
+      body: req.body !== undefined ? JSON.stringify(req.body) : undefined,
+    });
+    const text = await res.text();
+    let data: unknown = text;
+    try {
+      data = text === '' ? null : JSON.parse(text);
+    } catch {
+      // 非 JSON のレスポンスはそのまま文字列として返す
+    }
+    return { status: res.status, ok: res.ok, data };
   }
   async list(modelName: string) {
     return this.request<ModelRecord[]>('GET', `/api/${modelName}`);

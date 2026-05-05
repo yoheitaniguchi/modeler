@@ -1,4 +1,5 @@
 import type {
+  ButtonDefinition,
   FieldDefinition,
   FieldType,
   ModelDefinition,
@@ -110,6 +111,131 @@ export function validateModelDefinition(model: unknown, path: string): string[] 
       seen.add(name);
     }
   });
+
+  // UI 設定 (ボタン定義) のバリデーション。未設定なら何もしない。
+  if (m.ui !== undefined) {
+    errors.push(...validateUiConfig(m.ui, `${path}.ui`));
+  }
+  return errors;
+}
+
+const HTTP_METHODS: readonly string[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
+const BUTTON_SCOPES: readonly string[] = ['row', 'screen'];
+const BUTTON_STYLES: readonly string[] = ['primary', 'danger', 'ghost'];
+const BUILTIN_OPS: readonly string[] = ['create', 'update', 'edit', 'delete'];
+const ID_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
+
+function validateButtonDefinition(button: unknown, path: string): string[] {
+  const errors: string[] = [];
+  if (typeof button !== 'object' || button === null) {
+    return [`${path}: must be an object`];
+  }
+  const b = button as Partial<ButtonDefinition>;
+  if (typeof b.id !== 'string' || !ID_PATTERN.test(b.id)) {
+    errors.push(`${path}.id: must match ${ID_PATTERN}`);
+  }
+  if (typeof b.label !== 'string' || b.label.trim() === '') {
+    errors.push(`${path}.label: must be non-empty string`);
+  }
+  if (typeof b.scope !== 'string' || !BUTTON_SCOPES.includes(b.scope)) {
+    errors.push(`${path}.scope: must be one of ${BUTTON_SCOPES.join(', ')}`);
+  }
+  if (b.style !== undefined && !BUTTON_STYLES.includes(b.style as string)) {
+    errors.push(`${path}.style: must be one of ${BUTTON_STYLES.join(', ')}`);
+  }
+  // action
+  if (typeof b.action !== 'object' || b.action === null) {
+    errors.push(`${path}.action: must be an object`);
+  } else {
+    const a = b.action as { kind?: string };
+    if (a.kind === 'builtin') {
+      const op = (b.action as { op?: string }).op;
+      if (typeof op !== 'string' || !BUILTIN_OPS.includes(op)) {
+        errors.push(`${path}.action.op: must be one of ${BUILTIN_OPS.join(', ')}`);
+      }
+    } else if (a.kind === 'http') {
+      const http = b.action as {
+        method?: string;
+        url?: string;
+        bodyTemplate?: unknown;
+        confirmMessage?: unknown;
+        openResponseInNewTab?: unknown;
+      };
+      if (typeof http.method !== 'string' || !HTTP_METHODS.includes(http.method)) {
+        errors.push(`${path}.action.method: must be one of ${HTTP_METHODS.join(', ')}`);
+      }
+      if (typeof http.url !== 'string' || http.url.trim() === '') {
+        errors.push(`${path}.action.url: must be non-empty string`);
+      }
+      if (http.bodyTemplate !== undefined && typeof http.bodyTemplate !== 'string') {
+        errors.push(`${path}.action.bodyTemplate: must be string when provided`);
+      }
+      if (http.confirmMessage !== undefined && typeof http.confirmMessage !== 'string') {
+        errors.push(`${path}.action.confirmMessage: must be string when provided`);
+      }
+      if (
+        http.openResponseInNewTab !== undefined &&
+        typeof http.openResponseInNewTab !== 'boolean'
+      ) {
+        errors.push(`${path}.action.openResponseInNewTab: must be boolean when provided`);
+      }
+    } else {
+      errors.push(`${path}.action.kind: must be 'builtin' or 'http'`);
+    }
+  }
+  return errors;
+}
+
+function validateBuiltinOverride(value: unknown, path: string): string[] {
+  const errors: string[] = [];
+  if (typeof value !== 'object' || value === null) {
+    return [`${path}: must be an object`];
+  }
+  const v = value as { url?: unknown; method?: unknown };
+  if (typeof v.url !== 'string' || v.url.trim() === '') {
+    errors.push(`${path}.url: must be non-empty string`);
+  }
+  if (typeof v.method !== 'string' || !HTTP_METHODS.includes(v.method)) {
+    errors.push(`${path}.method: must be one of ${HTTP_METHODS.join(', ')}`);
+  }
+  return errors;
+}
+
+function validateUiConfig(ui: unknown, path: string): string[] {
+  const errors: string[] = [];
+  if (typeof ui !== 'object' || ui === null) {
+    return [`${path}: must be an object`];
+  }
+  const u = ui as { buttons?: unknown; builtinButtonOverrides?: unknown };
+  if (u.buttons !== undefined) {
+    if (!Array.isArray(u.buttons)) {
+      errors.push(`${path}.buttons: must be array`);
+    } else {
+      const seenIds = new Set<string>();
+      u.buttons.forEach((b, idx) => {
+        errors.push(...validateButtonDefinition(b, `${path}.buttons[${idx}]`));
+        const id = (b as { id?: unknown }).id;
+        if (typeof id === 'string') {
+          if (seenIds.has(id)) {
+            errors.push(`${path}.buttons[${idx}].id: duplicated "${id}"`);
+          }
+          seenIds.add(id);
+        }
+      });
+    }
+  }
+  if (u.builtinButtonOverrides !== undefined) {
+    if (typeof u.builtinButtonOverrides !== 'object' || u.builtinButtonOverrides === null) {
+      errors.push(`${path}.builtinButtonOverrides: must be object`);
+    } else {
+      const ov = u.builtinButtonOverrides as Record<string, unknown>;
+      for (const key of ['create', 'update', 'delete'] as const) {
+        if (ov[key] !== undefined) {
+          errors.push(...validateBuiltinOverride(ov[key], `${path}.builtinButtonOverrides.${key}`));
+        }
+      }
+    }
+  }
   return errors;
 }
 

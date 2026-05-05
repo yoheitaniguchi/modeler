@@ -14,6 +14,7 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:4000',
       '/meta': 'http://localhost:4000',
+      '/test': 'http://localhost:4000',
     },
   },
   test: {

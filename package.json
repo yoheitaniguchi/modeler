@@ -6,7 +6,8 @@
   "workspaces": [
     "shared",
     "server",
-    "client"
+    "client",
+    "e2e"
   ],
   "scripts": {
     "dev": "npm run dev --workspace=server & npm run dev --workspace=client",
@@ -15,6 +16,8 @@
     "build": "npm run build --workspace=shared && npm run build --workspace=server && npm run build --workspace=client",
     "test": "npm run test --workspace=shared && npm run test --workspace=server && npm run test --workspace=client",
     "test:server": "npm run test --workspace=server",
-    "test:client": "npm run test --workspace=client"
+    "test:client": "npm run test --workspace=client",
+    "test:e2e": "npm run test --workspace=e2e",
+    "test:e2e:ui": "npm run test:ui --workspace=e2e"
   }
 }
