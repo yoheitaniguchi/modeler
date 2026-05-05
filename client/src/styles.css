@@ -90,3 +90,33 @@ th { background: #f3f4f6; }
   background: #fafafa;
 }
 .ui-config-editor summary, .buttons-editor summary { cursor: pointer; }
+
+/* ヘルプアイコン (HelpTip) */
+.help-tip {
+  display: inline-block;
+  width: 1.05rem; height: 1.05rem; line-height: 1.05rem;
+  text-align: center; border-radius: 50%;
+  background: #e5e7eb; color: #4b5563;
+  font-size: 0.7rem; font-weight: 700;
+  margin-left: 0.25rem;
+  cursor: help;
+  user-select: none;
+  vertical-align: middle;
+}
+.help-tip:hover, .help-tip:focus { background: #d1d5db; outline: none; }
+
+/* インライン (即時) バリデーションメッセージ */
+.inline-error {
+  color: #b91c1c;
+  font-size: 0.75rem;
+  margin-top: 0.15rem;
+}
+input[aria-invalid="true"] { border-color: #f87171; }
+
+/* 必須フィールドの印 (FieldInput 内 boolean 表示用) */
+.required-mark { color: #dc2626; font-weight: 700; }
+
+/* ボタンの disabled 状態を ghost 系にも適用 */
+button.ghost:disabled, button.danger:disabled {
+  opacity: 0.5; cursor: not-allowed;
+}

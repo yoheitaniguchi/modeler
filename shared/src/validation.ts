@@ -25,7 +25,12 @@ export type ValidationResult =
 const FIELD_TYPES: readonly FieldType[] = ['string', 'number', 'boolean', 'date'];
 
 /** 識別子は英字始まり + 英数アンダースコア。SQL 予約語っぽい衝突を避ける素朴なルール。 */
-const IDENTIFIER_PATTERN = /^[a-zA-Z][a-zA-Z0-9_]*$/;
+export const IDENTIFIER_PATTERN = /^[a-zA-Z][a-zA-Z0-9_]*$/;
+
+/** 識別子として妥当か。UI 側でリアルタイム検証する際に再利用する。 */
+export function isValidIdentifier(name: string): boolean {
+  return IDENTIFIER_PATTERN.test(name);
+}
 
 export function validateFieldDefinition(field: unknown, path: string): string[] {
   const errors: string[] = [];
