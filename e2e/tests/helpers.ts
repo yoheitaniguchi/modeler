@@ -20,12 +20,17 @@ export async function newApiContext(): Promise<APIRequestContext> {
 /** 「設計タブ」をアクティブにする。 */
 export async function gotoDesignTab(page: Page) {
   await page.goto('/');
-  await page.getByRole('tab', { name: /モデル設計/ }).click();
+  // SPA の bootstrap が終わってタブが見えるまで待つ
+  const tab = page.getByRole('tab', { name: /モデル設計/ });
+  await tab.waitFor({ state: 'visible' });
+  await tab.click();
 }
 
 export async function gotoDeployedTab(page: Page) {
   await page.goto('/');
-  await page.getByRole('tab', { name: /デプロイ済みモデル/ }).click();
+  const tab = page.getByRole('tab', { name: /デプロイ済みモデル/ });
+  await tab.waitFor({ state: 'visible' });
+  await tab.click();
 }
 
 /**

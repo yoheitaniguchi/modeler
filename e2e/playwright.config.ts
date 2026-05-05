@@ -8,21 +8,26 @@ const repoRoot = path.resolve(__dirname, '..');
 /**
  * Playwright 設定。
  *
- *  - webServer で server (Express) と client (Vite) を自動起動
- *  - 各テストに新規データディレクトリを切るため、サーバーは MODELER_DATA_DIR=./e2e-data
- *  - CI ではリトライ + アーティファクト (trace, screenshot, video) を保存
- *  - ブラウザは chromium / firefox / webkit の 3 種をマトリクスで実行
+ *  - 本番ビルドした client を server (Express) が同一ポートで配信する構成
+ *    → port 4000 の単一サーバーで完結。CI 安定性を優先。
+ *  - 各テストはサーバーをまっさらな状態で開始したいので
+ *    MODELER_DATA_DIR を専用ディレクトリにする。
+ *  - CI ではリトライ + アーティファクト (trace, screenshot, video) を保存。
+ *  - ブラウザは chromium / firefox / webkit の 3 種をマトリクスで実行。
  */
 export default defineConfig({
   testDir: './tests',
-  fullyParallel: false, // サーバー側の DAO 状態を共有するため直列実行
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
+  // 個々のテストはせいぜい数秒〜10秒程度で終わるはず
+  timeout: 60_000,
+  expect: { timeout: 10_000 },
 
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:4000',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -34,28 +39,21 @@ export default defineConfig({
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
   ],
 
-  webServer: [
-    {
-      command: 'npm run dev:server',
-      cwd: repoRoot,
-      port: 4000,
-      reuseExistingServer: !process.env.CI,
-      stdout: 'pipe',
-      stderr: 'pipe',
-      env: {
-        MODELER_DATA_DIR: path.join(repoRoot, 'e2e', '.e2e-data'),
-        PORT: '4000',
-      },
-      timeout: 60_000,
+  webServer: {
+    // 本番ビルドした成果物を起動 (npm start は dist/index.js を node で実行)
+    command: 'npm start --workspace=@modeler/server',
+    cwd: repoRoot,
+    url: 'http://localhost:4000/health',
+    reuseExistingServer: !process.env.CI,
+    stdout: 'pipe',
+    stderr: 'pipe',
+    env: {
+      ...process.env,
+      MODELER_DATA_DIR: path.join(repoRoot, 'e2e', '.e2e-data'),
+      CLIENT_DIST_DIR: path.join(repoRoot, 'client', 'dist'),
+      PORT: '4000',
+      NODE_ENV: 'production',
     },
-    {
-      command: 'npm run dev:client',
-      cwd: repoRoot,
-      port: 5173,
-      reuseExistingServer: !process.env.CI,
-      stdout: 'pipe',
-      stderr: 'pipe',
-      timeout: 60_000,
-    },
-  ],
+    timeout: 120_000,
+  },
 });
