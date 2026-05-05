@@ -21,7 +21,9 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
-  reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
+  reporter: process.env.CI
+    ? [['list'], ['github'], ['html', { open: 'never' }]]
+    : 'list',
   // 個々のテストはせいぜい数秒〜10秒程度で終わるはず
   timeout: 60_000,
   expect: { timeout: 10_000 },
@@ -47,6 +49,9 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     stdout: 'pipe',
     stderr: 'pipe',
+    // 起動失敗時に CI ログから原因を追えるよう、webServer の出力を継承する
+    // (Playwright の stdout/stderr 設定は piped でも process.stdout に流れるが、
+    //  ここでは pipe を維持し、テスト失敗時のみ詳細が出るようにする)
     env: {
       ...process.env,
       MODELER_DATA_DIR: path.join(repoRoot, 'e2e', '.e2e-data'),
