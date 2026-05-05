@@ -89,6 +89,23 @@ export function createApp(options: AppOptions = {}): {
     res.json({ method: 'GET', query: req.query, ts: Date.now() });
   });
 
+  // E2E テスト用: 全モデルを削除しデータファイルも消す。
+  // これがないと前のテストで作ったレコードが次のテストに紛れ込む。
+  app.post('/test/reset', async (_req, res) => {
+    for (const m of registry.list()) registry.removeModel(m.name);
+    try {
+      const entries = await fsp.readdir(dataDir);
+      await Promise.all(
+        entries
+          .filter((n) => n.endsWith('.json'))
+          .map((n) => fsp.rm(path.join(dataDir, n), { force: true })),
+      );
+    } catch {
+      // ディレクトリが無い場合は無視
+    }
+    res.status(204).end();
+  });
+
   // ヘルスチェック (環境構築テスト用)
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });

@@ -1,16 +1,11 @@
 import { request, type APIRequestContext, type Page } from '@playwright/test';
 
 /**
- * 各テスト前にデプロイ済みモデルをすべて削除して状態をリセット。
- * データファイル (.e2e-data/*.json) は残るが、API ルートが消えるので影響なし。
+ * 各テスト前にサーバー状態 (デプロイ済みモデル + データファイル) を完全クリア。
+ * /test/reset を使うことで前テストのレコードが次テストに混じらない。
  */
 export async function resetDeployedModels(api: APIRequestContext) {
-  const res = await api.get('http://localhost:4000/meta/models');
-  if (!res.ok()) return;
-  const body = await res.json();
-  for (const m of body.models ?? []) {
-    await api.delete(`http://localhost:4000/meta/models/${m.name}`);
-  }
+  await api.post('http://localhost:4000/test/reset');
 }
 
 export async function newApiContext(): Promise<APIRequestContext> {
