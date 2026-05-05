@@ -8,6 +8,7 @@ import react from '@vitejs/plugin-react';
  * → CORS や baseURL の切替が要らずシンプル。
  */
 export default defineConfig({
+  base: '/modeler/',
   plugins: [react()],
   server: {
     port: 5173,
