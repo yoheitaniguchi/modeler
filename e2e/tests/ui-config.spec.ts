@@ -51,8 +51,8 @@ test.describe('画面定義 (UiConfig + ボタン定義) の保存/読込', () =
     await expect(page.locator('input[value="order"]')).toBeVisible();
     await expect(page.locator('input[value="注文"]')).toBeVisible();
 
-    // ボタン編集 details を開く
-    await page.getByText('カスタムボタン (REST API 呼び出し)').click();
+    // ButtonsEditor は buttons.length>0 のとき <details open> を初期状態で開く実装。
+    // クリックすると逆に閉じてしまうので、そのまま中身が見えるはず。
     await expect(page.locator('input[value="do_export"]')).toBeVisible();
     await expect(page.locator('input[value="エクスポート"]')).toBeVisible();
 
