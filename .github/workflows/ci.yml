@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
 
+# 同じブランチで CI が連続トリガされたとき、古い run を即座に止める。
+# 大量の同時 run が e2e レーンを占有して詰まるのを防ぐ。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-unit:
     name: Build & Unit tests
@@ -24,15 +30,17 @@ jobs:
       - run: npm run test --workspace=shared
       - run: npm run test --workspace=server
       - run: npm run test --workspace=client
-      # ビルド成果物 (dist) を後続 e2e ジョブへ渡し、各 e2e ジョブで再ビルドしないようにする。
+      # ビルド成果物 (shared/server/client の dist) を tar に固めて 1 ファイルで
+      # 受け渡す。actions/upload-artifact@v4 の複数 path 指定はサブディレクトリ
+      # 構造の解釈が場合により崩れる (LCA が単一 path 時と違う) ので、tar で
+      # ディレクトリ構造を確実に保存する。
+      - name: Pack build outputs
+        run: tar -czf dist.tar.gz shared/dist server/dist client/dist
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: dist
-          path: |
-            shared/dist
-            server/dist
-            client/dist
+          path: dist.tar.gz
           retention-days: 1
           if-no-files-found: error
 
@@ -57,6 +65,8 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: dist
+      - name: Unpack build outputs
+        run: tar -xzf dist.tar.gz
       # Playwright のブラウザバイナリは playwright バージョンが変わらない限り
       # 使い回せるので actions/cache でランナー間共有する。apt 由来のシステム
       # 依存はランナー再生成で消えるため毎回入れる必要があるが、ブラウザ本体の
