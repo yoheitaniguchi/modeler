@@ -18,18 +18,21 @@ test.describe('デプロイ済みモデルのインライン編集/削除', () =
     await page.getByTestId('edit-deployed').click();
     await expect(page.getByTestId('inline-model-editor')).toBeVisible();
 
-    // フィールド追加
-    await page.getByRole('button', { name: '+ フィールド追加' }).click();
-    const lastNameInput = page.getByPlaceholder('e.g., email').last();
+    // フィールド追加: 編集領域内のボタンをクリック
+    const editor = page.getByTestId('inline-model-editor');
+    await editor.getByRole('button', { name: '+ フィールド追加' }).click();
+
+    // 末尾の新しい行に email を入力
+    const lastNameInput = editor.getByPlaceholder('e.g., email').last();
     await lastNameInput.fill('email');
-    const lastLabelInput = page.getByPlaceholder('e.g., メール').last();
+    const lastLabelInput = editor.getByPlaceholder('e.g., メール').last();
     await lastLabelInput.fill('メール');
 
     await page.getByTestId('save-inline-edit').click();
     await expect(page.getByTestId('inline-model-editor')).toBeHidden();
 
     // 既存データが残っているか
-    await expect(page.getByRole('cell', { name: 'PreExisting' })).toBeVisible();
+    await expect(page.getByRole('cell', { name: 'PreExisting', exact: true })).toBeVisible();
     // 新カラム (メール) が表示されているか
     await expect(page.getByRole('columnheader', { name: 'メール' })).toBeVisible();
   });

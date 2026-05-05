@@ -1,16 +1,11 @@
 import { request, type APIRequestContext, type Page } from '@playwright/test';
 
 /**
- * 各テスト前にデプロイ済みモデルをすべて削除して状態をリセット。
- * データファイル (.e2e-data/*.json) は残るが、API ルートが消えるので影響なし。
+ * 各テスト前にサーバー状態 (デプロイ済みモデル + データファイル) を完全クリア。
+ * /test/reset を使うことで前テストのレコードが次テストに混じらない。
  */
 export async function resetDeployedModels(api: APIRequestContext) {
-  const res = await api.get('http://localhost:4000/meta/models');
-  if (!res.ok()) return;
-  const body = await res.json();
-  for (const m of body.models ?? []) {
-    await api.delete(`http://localhost:4000/meta/models/${m.name}`);
-  }
+  await api.post('http://localhost:4000/test/reset');
 }
 
 export async function newApiContext(): Promise<APIRequestContext> {
@@ -20,12 +15,17 @@ export async function newApiContext(): Promise<APIRequestContext> {
 /** 「設計タブ」をアクティブにする。 */
 export async function gotoDesignTab(page: Page) {
   await page.goto('/');
-  await page.getByRole('tab', { name: /モデル設計/ }).click();
+  // SPA の bootstrap が終わってタブが見えるまで待つ
+  const tab = page.getByRole('tab', { name: /モデル設計/ });
+  await tab.waitFor({ state: 'visible' });
+  await tab.click();
 }
 
 export async function gotoDeployedTab(page: Page) {
   await page.goto('/');
-  await page.getByRole('tab', { name: /デプロイ済みモデル/ }).click();
+  const tab = page.getByRole('tab', { name: /デプロイ済みモデル/ });
+  await tab.waitFor({ state: 'visible' });
+  await tab.click();
 }
 
 /**

@@ -1,6 +1,7 @@
 import express, { type Express } from 'express';
 import cors from 'cors';
 import path from 'node:path';
+import { promises as fsp, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { DeployError, DeployRegistry } from './deploy/registry.js';
 
@@ -14,6 +15,8 @@ import { DeployError, DeployRegistry } from './deploy/registry.js';
  */
 export interface AppOptions {
   dataDir?: string;
+  /** 設定された場合、その配下の静的ファイルを配信する (E2E / 本番モード)。 */
+  clientDistDir?: string;
 }
 
 export function createApp(options: AppOptions = {}): {
@@ -86,10 +89,46 @@ export function createApp(options: AppOptions = {}): {
     res.json({ method: 'GET', query: req.query, ts: Date.now() });
   });
 
+  // E2E テスト用: 全モデルを削除しデータファイルも消す。
+  // これがないと前のテストで作ったレコードが次のテストに紛れ込む。
+  app.post('/test/reset', async (_req, res) => {
+    for (const m of registry.list()) registry.removeModel(m.name);
+    try {
+      const entries = await fsp.readdir(dataDir);
+      await Promise.all(
+        entries
+          .filter((n) => n.endsWith('.json'))
+          .map((n) => fsp.rm(path.join(dataDir, n), { force: true })),
+      );
+    } catch {
+      // ディレクトリが無い場合は無視
+    }
+    res.status(204).end();
+  });
+
   // ヘルスチェック (環境構築テスト用)
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
   });
+
+  // E2E / 本番モード: client の build 成果物を同一サーバーから配信。
+  // CLIENT_DIST_DIR 未指定時は ../../client/dist を見に行く (build 後に存在)。
+  const clientDistDir =
+    options.clientDistDir ??
+    process.env.CLIENT_DIST_DIR ??
+    path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'client', 'dist');
+  if (existsSync(clientDistDir)) {
+    app.use(express.static(clientDistDir));
+    // SPA フォールバック: 既知の API パスでない GET は index.html を返す
+    app.get(/^\/(?!api|meta|test|health).*/, async (_req, res, next) => {
+      try {
+        const html = await fsp.readFile(path.join(clientDistDir, 'index.html'), 'utf-8');
+        res.set('Content-Type', 'text/html').send(html);
+      } catch (e) {
+        next(e);
+      }
+    });
+  }
 
   return { app, registry, dataDir };
 }

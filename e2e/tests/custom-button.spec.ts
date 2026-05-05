@@ -5,7 +5,6 @@ test.describe('カスタムボタン (REST API 呼び出し)', () => {
   test.beforeEach(async () => {
     const api = await newApiContext();
     await resetDeployedModels(api);
-    // ボタン定義を含むモデルをデプロイ
     await api.post('http://localhost:4000/meta/deploy', {
       data: {
         version: 1,
@@ -46,6 +45,8 @@ test.describe('カスタムボタン (REST API 呼び出し)', () => {
   test('画面ボタンを押すと成功通知が出る', async ({ page }) => {
     await gotoDeployedTab(page);
     await page.getByTestId('model-select').selectOption('customer');
+    await expect(page.getByTestId('screen-button-echo_screen')).toBeVisible();
+
     await page.getByTestId('screen-button-echo_screen').click();
     await expect(page.locator('.notice')).toContainText('画面ボタン');
   });
@@ -53,8 +54,11 @@ test.describe('カスタムボタン (REST API 呼び出し)', () => {
   test('行ボタンが行ごとに表示され、押下できる', async ({ page }) => {
     await gotoDeployedTab(page);
     await page.getByTestId('model-select').selectOption('customer');
-    // テストID は row-button-{id}-{recordId} で動的だが、表記の "行ボタン" でも取得可能
-    await page.getByRole('button', { name: '行ボタン' }).click();
+    await expect(page.getByRole('cell', { name: 'Alice', exact: true })).toBeVisible();
+
+    const rowButton = page.getByRole('button', { name: '行ボタン' });
+    await expect(rowButton).toBeVisible();
+    await rowButton.click();
     await expect(page.locator('.notice')).toContainText('行ボタン');
   });
 });

@@ -6,7 +6,6 @@ test.describe('検索/フィルタ/ソート', () => {
     const api = await newApiContext();
     await resetDeployedModels(api);
     await deployCustomer(api);
-    // 5 件作成
     for (const r of [
       { name: 'Alice', age: 30, active: true },
       { name: 'Bob', age: 25, active: false },
@@ -26,15 +25,17 @@ test.describe('検索/フィルタ/ソート', () => {
 
     await page.getByTestId('search-keyword').fill('ali');
     await expect(page.getByTestId('hit-count')).toContainText('1 / 5');
-    await expect(page.getByRole('cell', { name: 'Alice' })).toBeVisible();
+    await expect(page.getByRole('cell', { name: 'Alice', exact: true })).toBeVisible();
   });
 
   test('詳細検索 (number ≥) が動く', async ({ page }) => {
     await gotoDeployedTab(page);
     await page.getByTestId('model-select').selectOption('customer');
-    await page.getByTestId('toggle-advanced').click();
+    await expect(page.getByTestId('hit-count')).toContainText('5 / 5');
 
-    // 年齢の行を取得 (label: 年齢)
+    await page.getByTestId('toggle-advanced').click();
+    await expect(page.getByTestId('advanced-filters')).toBeVisible();
+
     const ageRow = page.locator('.filter-row', { hasText: '年齢' });
     await ageRow.getByRole('combobox').selectOption('gte');
     await ageRow.getByRole('spinbutton').fill('30');
@@ -44,15 +45,12 @@ test.describe('検索/フィルタ/ソート', () => {
   test('カラムヘッダクリックでソートできる', async ({ page }) => {
     await gotoDeployedTab(page);
     await page.getByTestId('model-select').selectOption('customer');
+    await expect(page.getByTestId('hit-count')).toContainText('5 / 5');
 
-    // 年齢で昇順
     await page.getByTestId('sort-age').click();
-    const firstName = await page.locator('table tbody tr').first().locator('td').first().textContent();
-    expect(firstName).toBe('Bob'); // age=25 が最小
+    await expect(page.locator('table tbody tr').first().locator('td').first()).toHaveText('Bob');
 
-    // もう一度クリックで降順
     await page.getByTestId('sort-age').click();
-    const firstNameDesc = await page.locator('table tbody tr').first().locator('td').first().textContent();
-    expect(firstNameDesc).toBe('Charlie'); // age=40 が最大
+    await expect(page.locator('table tbody tr').first().locator('td').first()).toHaveText('Charlie');
   });
 });

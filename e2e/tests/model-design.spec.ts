@@ -12,12 +12,14 @@ test.describe('モデル設計', () => {
     await gotoDesignTab(page);
 
     await page.getByTestId('add-model').click();
-    // 1 つ目のモデル入力
-    await page.getByPlaceholder('customer').first().fill('product');
-    await page.getByPlaceholder('顧客').first().fill('商品');
-    // 1 つ目のフィールドを埋める
-    await page.getByPlaceholder('e.g., email').first().fill('title');
-    await page.getByPlaceholder('e.g., メール').first().fill('タイトル');
+    // モデルカードが現れるまで待つ
+    const card = page.locator('.card').filter({ hasText: 'モデル名' }).first();
+    await expect(card).toBeVisible();
+
+    await card.getByPlaceholder('customer').fill('product');
+    await card.getByPlaceholder('顧客').fill('商品');
+    await card.getByPlaceholder('e.g., email').fill('title');
+    await card.getByPlaceholder('e.g., メール').fill('タイトル');
 
     await page.getByTestId('deploy').click();
     await expect(page.locator('.notice')).toContainText('デプロイ');

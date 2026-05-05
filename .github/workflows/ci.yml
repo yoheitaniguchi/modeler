@@ -36,11 +36,17 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm run build --workspace=shared
+      - name: Build all packages
+        run: |
+          npm run build --workspace=shared
+          npm run build --workspace=server
+          npm run build --workspace=client
       - name: Install Playwright browsers
-        run: npx --workspace=e2e playwright install --with-deps ${{ matrix.browser }}
+        working-directory: e2e
+        run: npx playwright install --with-deps ${{ matrix.browser }}
       - name: Run E2E
-        run: npx --workspace=e2e playwright test --project=${{ matrix.browser }}
+        working-directory: e2e
+        run: npx playwright test --project=${{ matrix.browser }}
       - name: Upload report
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
