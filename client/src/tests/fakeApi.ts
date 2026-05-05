@@ -21,9 +21,18 @@ export function createFakeApi(): ApiClient & { _store: Map<string, ModelRecord[]
       return { deployed: models };
     },
     async listModels() { return models; },
+    async updateModel(name, model) {
+      const idx = models.findIndex((m) => m.name === name);
+      if (idx === -1) throw new Error('not found');
+      models = models.map((m, i) => (i === idx ? model : m));
+      return model;
+    },
     async deleteModel(name) {
       models = models.filter((m) => m.name !== name);
       store.delete(name);
+    },
+    async callCustom(req) {
+      return { status: 200, ok: true, data: { method: req.method, url: req.url, body: req.body ?? null } };
     },
     async list(name) { return store.get(name) ?? []; },
     async create(name, body) {

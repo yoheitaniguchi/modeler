@@ -1,8 +1,8 @@
 import { useRef } from 'react';
-import type { FieldType } from '@modeler/shared';
 import type { ApiClient } from '../services/api.js';
 import { downloadAsFile } from '../services/jsonIo.js';
 import { useModelerViewModel } from '../viewmodels/useModelerViewModel.js';
+import { ModelEditor } from '../components/ModelEditor.js';
 
 /**
  * モデル設計 View。
@@ -12,79 +12,6 @@ import { useModelerViewModel } from '../viewmodels/useModelerViewModel.js';
  *   - クリック時の処理も ViewModel のメソッドを呼ぶだけ
  * View の責務は「現在状態を画面に表示する」「ユーザー入力を ViewModel に伝える」のみ。
  */
-
-const FIELD_TYPES: FieldType[] = ['string', 'number', 'boolean', 'date'];
-
-/**
- * フィールド型に応じて、デフォルト値の入力を出し分ける。
- */
-function DefaultValueInput({
-  field,
-  onChange,
-}: {
-  field: {type: FieldType; defaultValue?: unknown};
-  onChange: (v: unknown) => void;
-}) {
-  const value = field.defaultValue;
-  const clear = () => onChange(undefined);
-
-  switch (field.type) {
-    case 'string':
-      return (
-        <div style={{ display: 'flex', gap: '0.3rem' }}>
-          <input
-            type="text"
-            value={(value as string) ?? ''}
-            placeholder="(なし)"
-            onChange={(e) => onChange(e.target.value === '' ? undefined : e.target.value)}
-            style={{ fontSize: '0.9rem', flex: 1 }}
-          />
-          {value !== undefined && <button className="ghost" onClick={clear} style={{ padding: '0.2rem 0.4rem', fontSize: '0.8rem' }}>✕</button>}
-        </div>
-      );
-    case 'number':
-      return (
-        <div style={{ display: 'flex', gap: '0.3rem' }}>
-          <input
-            type="number"
-            value={(value as number) ?? ''}
-            placeholder="(なし)"
-            onChange={(e) => onChange(e.target.value === '' ? undefined : Number(e.target.value))}
-            style={{ fontSize: '0.9rem', flex: 1 }}
-          />
-          {value !== undefined && <button className="ghost" onClick={clear} style={{ padding: '0.2rem 0.4rem', fontSize: '0.8rem' }}>✕</button>}
-        </div>
-      );
-    case 'date':
-      return (
-        <div style={{ display: 'flex', gap: '0.3rem' }}>
-          <input
-            type="date"
-            value={(value as string) ?? ''}
-            onChange={(e) => onChange(e.target.value === '' ? undefined : e.target.value)}
-            style={{ fontSize: '0.9rem', flex: 1 }}
-          />
-          {value !== undefined && <button className="ghost" onClick={clear} style={{ padding: '0.2rem 0.4rem', fontSize: '0.8rem' }}>✕</button>}
-        </div>
-      );
-    case 'boolean':
-      return (
-        <select
-          value={value === undefined ? '' : String(value)}
-          onChange={(e) => {
-            if (e.target.value === '') onChange(undefined);
-            else onChange(e.target.value === 'true');
-          }}
-          style={{ fontSize: '0.9rem' }}
-        >
-          <option value="">(なし)</option>
-          <option value="true">true</option>
-          <option value="false">false</option>
-        </select>
-      );
-  }
-}
-
 export function ModelDesignerView({ api }: { api: ApiClient }) {
   const vm = useModelerViewModel(api);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -107,16 +34,21 @@ export function ModelDesignerView({ api }: { api: ApiClient }) {
   return (
     <section>
       <p className="muted">
-        マスタメンテナンス画面のモデルを定義します。フィールドを追加し、必要に応じて
-        「必須 (NOT NULL)」を指定してください。完成したら「デプロイ」を押すと、定義通りの
+        マスタメンテナンス画面のモデルを定義します。フィールドや「画面設定」「カスタムボタン」も
+        含めて 1 つの JSON に保存・読込できます。完成したら「デプロイ」を押すと、定義通りの
         CRUD 画面と REST API が生成されます。
       </p>
 
       <div className="row" style={{ marginBottom: '1rem' }}>
-        <button className="primary" onClick={vm.addModel}>+ モデル追加</button>
-        <button className="ghost" onClick={onSave}>JSON 保存</button>
-        <button className="ghost" onClick={onLoadClick}>JSON 読込</button>
-        <button className="primary" onClick={onDeploy} disabled={vm.document.models.length === 0}>
+        <button className="primary" onClick={vm.addModel} data-testid="add-model">+ モデル追加</button>
+        <button className="ghost" onClick={onSave} data-testid="save-json">JSON 保存</button>
+        <button className="ghost" onClick={onLoadClick} data-testid="load-json">JSON 読込</button>
+        <button
+          className="primary"
+          onClick={onDeploy}
+          disabled={vm.document.models.length === 0}
+          data-testid="deploy"
+        >
           デプロイ
         </button>
         <input
@@ -124,10 +56,11 @@ export function ModelDesignerView({ api }: { api: ApiClient }) {
           type="file"
           accept="application/json"
           style={{ display: 'none' }}
+          data-testid="load-json-input"
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) void onLoadFile(file);
-            e.target.value = ''; // 同じファイルを連続選択しても onChange を発火させる
+            e.target.value = '';
           }}
         />
       </div>
@@ -146,114 +79,11 @@ export function ModelDesignerView({ api }: { api: ApiClient }) {
 
       {vm.document.models.map((model, mi) => (
         <div className="card" key={mi}>
-          <div className="row" style={{ justifyContent: 'space-between' }}>
-            <div className="row">
-              <label>モデル名 <input
-                type="text"
-                value={model.name}
-                placeholder="customer"
-                onChange={(e) => vm.updateModel(mi, { name: e.target.value })}
-              /></label>
-              <label>ラベル <input
-                type="text"
-                value={model.label}
-                placeholder="顧客"
-                onChange={(e) => vm.updateModel(mi, { label: e.target.value })}
-              /></label>
-            </div>
-            <button className="danger" onClick={() => vm.removeModel(mi)}>モデル削除</button>
-          </div>
-
-          <table style={{ marginTop: '0.6rem', fontSize: '0.9rem' }}>
-            <thead>
-              <tr>
-                <th style={{ width: '16%' }}>name</th>
-                <th style={{ width: '16%' }}>label</th>
-                <th style={{ width: '14%' }}>type</th>
-                <th style={{ width: '10%' }}>必須</th>
-                <th style={{ width: '20%' }}>デフォルト値</th>
-                <th style={{ width: '18%' }}>optionsUrl</th>
-                <th style={{ width: '6%' }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {model.fields.map((field, fi) => (
-                <tr key={fi}>
-                  <td>
-                    <input
-                      type="text"
-                      value={field.name}
-                      placeholder="e.g., email"
-                      onChange={(e) => vm.updateField(mi, fi, { name: e.target.value })}
-                      style={{ fontSize: '0.9rem' }}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="text"
-                      value={field.label}
-                      placeholder="e.g., メール"
-                      onChange={(e) => vm.updateField(mi, fi, { label: e.target.value })}
-                      style={{ fontSize: '0.9rem' }}
-                    />
-                  </td>
-                  <td>
-                    <select
-                      value={field.type}
-                      onChange={(e) => {
-                        const newType = e.target.value as FieldType;
-                        // type が string 以外に変わった場合、optionsUrl をクリア
-                        vm.updateField(mi, fi, {
-                          type: newType,
-                          optionsUrl: newType === 'string' ? field.optionsUrl : undefined,
-                        });
-                      }}
-                      style={{ fontSize: '0.9rem' }}
-                    >
-                      {FIELD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </td>
-                  <td style={{ textAlign: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={field.required}
-                      onChange={(e) => vm.updateField(mi, fi, { required: e.target.checked })}
-                    />
-                  </td>
-                  <td>
-                    <DefaultValueInput
-                      field={field}
-                      onChange={(v) => vm.updateField(mi, fi, { defaultValue: v })}
-                    />
-                  </td>
-                  <td>
-                    {field.type === 'string' ? (
-                      <input
-                        type="text"
-                        value={field.optionsUrl ?? ''}
-                        placeholder="/api/categories"
-                        onChange={(e) => vm.updateField(mi, fi, { optionsUrl: e.target.value || undefined })}
-                        style={{ fontSize: '0.9rem' }}
-                      />
-                    ) : (
-                      <span className="muted" style={{ fontSize: '0.8rem' }}>(string型のみ)</span>
-                    )}
-                  </td>
-                  <td style={{ textAlign: 'center' }}>
-                    <button
-                      className="danger"
-                      onClick={() => vm.removeField(mi, fi)}
-                      disabled={model.fields.length <= 1}
-                      style={{ fontSize: '0.85rem', padding: '0.2rem 0.4rem' }}
-                    >削除</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <button className="ghost" onClick={() => vm.addField(mi)} style={{ marginTop: '0.5rem' }}>
-            + フィールド追加
-          </button>
+          <ModelEditor
+            model={model}
+            onChange={(next) => vm.replaceModel(mi, next)}
+            onRemoveModel={() => vm.removeModel(mi)}
+          />
         </div>
       ))}
     </section>

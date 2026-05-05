@@ -76,7 +76,7 @@ function SelectField({
   value: unknown;
   onChange: (v: unknown) => void;
 }) {
-  const [options, setOptions] = useState<Array<{ id: string; label: string }>[]>([]);
+  const [options, setOptions] = useState<Array<{ id: string; label: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
