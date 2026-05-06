@@ -1,10 +1,16 @@
 import pino from 'pino';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'node:fs';
 import type { Logger as SharedLogger } from '@modeler/shared';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const logsDir = path.resolve(__dirname, '../../..', 'log');
+
+// Ensure log directory exists so pino-file target does not fail with ENOENT
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
 
 const pinoLogger = pino(
   {
