@@ -8,6 +8,7 @@ import { isValidIdentifier } from '@modeler/shared';
 import { UiConfigEditor } from './UiConfigEditor.js';
 import { ButtonsEditor } from './ButtonsEditor.js';
 import { HelpTip } from './HelpTip.js';
+import { SqlExportButton } from './SqlExportButton.js';
 
 /**
  * 単一モデルの編集 UI。
@@ -135,9 +136,12 @@ export function ModelEditor({
             )}
           </div>
         </div>
-        {showRemoveModel && onRemoveModel && (
-          <button className="danger" onClick={onRemoveModel}>モデル削除</button>
-        )}
+        <div style={{ display: 'flex', gap: '0.4rem' }}>
+          <SqlExportButton model={model} />
+          {showRemoveModel && onRemoveModel && (
+            <button className="danger" onClick={onRemoveModel}>モデル削除</button>
+          )}
+        </div>
       </div>
 
       <table style={{ marginTop: '0.6rem', fontSize: '0.9rem' }}>

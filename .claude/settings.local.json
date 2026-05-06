@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls ~/.claude/projects/ | head -20)",
+      "Read(//c/Users/yopey/.claude/projects/**)",
+      "Bash(awk '{print $2}')",
+      "Bash(py -3 --version)",
+      "Bash(node \"C:\\\\Users\\\\yopey\\\\AppData\\\\Local\\\\Temp\\\\extract_tools.mjs\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\dev\\\\modeler\" -Depth 2 -Directory)",
+      "Bash(Select-Object FullName)",
+      "Bash(xargs grep -l \"CREATE\\\\|SQL\")",
+      "Bash(npm run *)"
+    ]
+  }
+}

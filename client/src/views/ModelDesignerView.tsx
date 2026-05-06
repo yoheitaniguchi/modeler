@@ -22,7 +22,7 @@ export function ModelDesignerView({ api }: { api: ApiClient }) {
   // 「保存」ボタン: ViewModel から JSON 文字列を取得 → ファイル化
   const onSave = () => {
     const json = vm.exportJson();
-    if (json) downloadAsFile('model-definition.json', json);
+    if (json) downloadAsFile('model-definition.json', json, 'application/json');
   };
 
   // 「読み込み」ボタン: 隠した <input type="file"> をプログラムからクリック

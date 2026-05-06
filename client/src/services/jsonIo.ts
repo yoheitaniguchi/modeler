@@ -40,8 +40,12 @@ export class JsonParseError extends Error {
  * ブラウザでファイルとしてダウンロードさせる。
  * View からはこの 1 関数を呼ぶだけ。テスト時はスパイで差し替える想定。
  */
-export function downloadAsFile(filename: string, text: string): void {
-  const blob = new Blob([text], { type: 'application/json' });
+export function downloadAsFile(
+  filename: string,
+  text: string,
+  mimeType: string = 'application/octet-stream',
+): void {
+  const blob = new Blob([text], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
