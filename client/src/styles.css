@@ -83,6 +83,11 @@ th { background: #f3f4f6; }
   min-width: 18rem; max-width: 36rem;
   box-shadow: 0 8px 24px rgba(0,0,0,0.2);
 }
+.modal--wide {
+  min-width: 32rem;
+  max-width: 56rem;
+  width: 90vw;
+}
 
 /* 画面定義エディタ */
 .ui-config-editor details, .buttons-editor details {
@@ -119,4 +124,29 @@ input[aria-invalid="true"] { border-color: #f87171; }
 /* ボタンの disabled 状態を ghost 系にも適用 */
 button.ghost:disabled, button.danger:disabled {
   opacity: 0.5; cursor: not-allowed;
+}
+
+/* 詳細フォーム 2カラムグリッド */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1.5rem;
+  margin-top: 1rem;
+}
+
+/* ラベル + 入力のペア */
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.field-group > label {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+.field-group input[type=text],
+.field-group input[type=number],
+.field-group input[type=date],
+.field-group select {
+  width: 100%;
 }

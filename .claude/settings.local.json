@@ -9,7 +9,9 @@
       "Bash(Get-ChildItem -Path \"c:\\\\dev\\\\modeler\" -Depth 2 -Directory)",
       "Bash(Select-Object FullName)",
       "Bash(xargs grep -l \"CREATE\\\\|SQL\")",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(dir c:\\\\dev\\\\modeler /b)",
+      "Bash(curl -s http://localhost:5173)"
     ]
   }
 }

@@ -6,9 +6,9 @@ import type {
 } from '@modeler/shared';
 import type { ApiClient } from '../services/api.js';
 import { ApiError } from '../services/api.js';
-import { FieldInput } from '../components/FieldInput.js';
 import { SearchBar } from '../components/SearchBar.js';
 import { ConfirmDialog } from '../components/ConfirmDialog.js';
+import { RecordFormModal } from '../components/RecordFormModal.js';
 import { useCrudViewModel } from '../viewmodels/useCrudViewModel.js';
 import { buildRequestBody, TemplateError } from '../services/template.js';
 
@@ -23,44 +23,82 @@ import { buildRequestBody, TemplateError } from '../services/template.js';
 
 export function CrudView({ api, model }: { api: ApiClient; model: ModelDefinition }) {
   const vm = useCrudViewModel(api, model);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<Record<string, unknown>>(() => emptyForm(model));
   const [confirm, setConfirm] = useState<{ message: string; onOk: () => void } | null>(null);
   const [actionError, setActionError] = useState<string[]>([]);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalRecord, setModalRecord] = useState<ModelRecord | null>(null);
+  const [modalSaving, setModalSaving] = useState(false);
+  const [modalErrors, setModalErrors] = useState<string[]>([]);
 
   const overrides = model.ui?.builtinButtonOverrides ?? {};
   const customButtons = model.ui?.buttons ?? [];
   const screenButtons = customButtons.filter((b) => b.scope === 'screen');
   const rowButtons = customButtons.filter((b) => b.scope === 'row');
 
-  const startEdit = (record: ModelRecord) => {
-    setEditingId(record.id);
-    setForm({ ...record });
-  };
-  const cancelEdit = () => {
-    setEditingId(null);
-    setForm(emptyForm(model));
+  const openCreateModal = () => {
+    setModalRecord(null);
+    setModalErrors([]);
+    setModalOpen(true);
   };
 
-  const onSubmit = async () => {
-    setActionError([]);
-    if (editingId) {
-      const ok = overrides.update
-        ? await callOverride(api, overrides.update, { ...form, id: editingId }, setActionError)
-        : await vm.update(editingId, form);
-      if (ok) {
-        cancelEdit();
-        if (overrides.update) await vm.reload();
+  const openEditModal = (record: ModelRecord) => {
+    setModalRecord(record);
+    setModalErrors([]);
+    setModalOpen(true);
+  };
+
+  const closeModal = () => setModalOpen(false);
+
+  const handleModalSave = async (form: Record<string, unknown>, keepOpen: boolean) => {
+    setModalSaving(true);
+    setModalErrors([]);
+    try {
+      if (modalRecord) {
+        if (overrides.update) {
+          const res = await api.callCustom({
+            method: overrides.update.method,
+            url: overrides.update.url,
+            body: { ...form, id: modalRecord.id },
+          });
+          if (!res.ok) {
+            setModalErrors([`HTTP ${res.status}: ${stringifyData(res.data)}`]);
+            setModalSaving(false);
+            return;
+          }
+        } else {
+          await api.update(model.name, modalRecord.id, form);
+        }
+      } else {
+        if (overrides.create) {
+          const res = await api.callCustom({
+            method: overrides.create.method,
+            url: overrides.create.url,
+            body: form,
+          });
+          if (!res.ok) {
+            setModalErrors([`HTTP ${res.status}: ${stringifyData(res.data)}`]);
+            setModalSaving(false);
+            return;
+          }
+        } else {
+          await api.create(model.name, form);
+        }
       }
-    } else {
-      const ok = overrides.create
-        ? await callOverride(api, overrides.create, form, setActionError)
-        : await vm.create(form);
-      if (ok) {
-        cancelEdit();
-        if (overrides.create) await vm.reload();
+      await vm.reload();
+      if (keepOpen) {
+        setModalRecord(null);
+      } else {
+        closeModal();
       }
+    } catch (e) {
+      if (e instanceof ApiError) {
+        setModalErrors(e.toMessages());
+      } else {
+        setModalErrors([String(e)]);
+      }
+    } finally {
+      setModalSaving(false);
     }
   };
 
@@ -135,6 +173,9 @@ export function CrudView({ api, model }: { api: ApiClient; model: ModelDefinitio
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <h2 style={{ margin: '0 0 0.5rem' }} data-testid="crud-title">{title}</h2>
         <div className="row">
+          <button className="primary" onClick={openCreateModal} data-testid="create-button">
+            {createLabel}
+          </button>
           {screenButtons.map((b) => (
             <button
               key={b.id}
@@ -168,25 +209,6 @@ export function CrudView({ api, model }: { api: ApiClient; model: ModelDefinitio
         total={vm.records.length}
       />
 
-      <div className="row" style={{ marginBottom: '0.6rem', marginTop: '0.6rem' }}>
-        {model.fields.map((f) => (
-          <FieldInput
-            key={f.name}
-            field={f}
-            value={form[f.name]}
-            onChange={(v) => setForm((prev) => ({ ...prev, [f.name]: v }))}
-          />
-        ))}
-        <button className="primary" onClick={onSubmit} data-testid="submit-form">
-          {editingId ? saveLabel : createLabel}
-        </button>
-        {editingId && (
-          <button className="ghost" onClick={cancelEdit} data-testid="cancel-edit">
-            {cancelLabel}
-          </button>
-        )}
-      </div>
-
       <table>
         <thead>
           <tr>
@@ -217,7 +239,7 @@ export function CrudView({ api, model }: { api: ApiClient; model: ModelDefinitio
                 <td key={f.name}>{renderValue(record[f.name])}</td>
               ))}
               <td>
-                <button className="ghost" onClick={() => startEdit(record)} data-testid={`edit-${record.id}`}>編集</button>{' '}
+                <button className="ghost" onClick={() => openEditModal(record)} data-testid={`edit-${record.id}`}>更新</button>{' '}
                 <button className="danger" onClick={() => onDelete(record.id)} data-testid={`delete-${record.id}`}>削除</button>
                 {rowButtons.map((b) => (
                   <span key={b.id}>
@@ -243,20 +265,18 @@ export function CrudView({ api, model }: { api: ApiClient; model: ModelDefinitio
         onOk={() => confirm?.onOk()}
         onCancel={() => setConfirm(null)}
       />
+
+      <RecordFormModal
+        open={modalOpen}
+        model={model}
+        initialRecord={modalRecord}
+        saving={modalSaving}
+        errors={modalErrors}
+        onSave={handleModalSave}
+        onCancel={closeModal}
+      />
     </div>
   );
-}
-
-function emptyForm(model: ModelDefinition): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const f of model.fields) {
-    if (f.defaultValue !== undefined) {
-      out[f.name] = f.defaultValue;
-    } else {
-      out[f.name] = f.type === 'boolean' ? false : '';
-    }
-  }
-  return out;
 }
 
 function renderValue(v: unknown): string {
