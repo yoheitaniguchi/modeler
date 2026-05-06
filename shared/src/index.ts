@@ -10,3 +10,4 @@
 
 export * from './model.js';
 export * from './validation.js';
+export * from './logger.js';

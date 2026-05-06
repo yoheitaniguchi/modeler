@@ -1,4 +1,5 @@
 import { createApp } from './app.js';
+import { logger } from './services/logger.js';
 
 /**
  * エントリーポイント。app.ts と分けている理由はテスト容易性 (createApp() が
@@ -8,5 +9,5 @@ const PORT = Number(process.env.PORT ?? 4000);
 const { app } = createApp();
 
 app.listen(PORT, () => {
-  console.log(`[modeler] server listening on http://localhost:${PORT}`);
+  logger.info('Server startup', { port: PORT, url: `http://localhost:${PORT}` });
 });

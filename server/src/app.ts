@@ -4,6 +4,7 @@ import path from 'node:path';
 import { promises as fsp, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { DeployError, DeployRegistry } from './deploy/registry.js';
+import { logger } from './services/logger.js';
 
 /**
  * Express アプリのファクトリ関数。
@@ -39,20 +40,28 @@ export function createApp(options: AppOptions = {}): {
 
   // メタ API: 現在デプロイされているモデル一覧
   app.get('/meta/models', (_req, res) => {
-    res.json({ models: registry.list() });
+    const models = registry.list();
+    logger.debug('Fetched models list', { count: models.length });
+    res.json({ models });
   });
 
   // メタ API: デプロイ
   app.post('/meta/deploy', async (req, res) => {
     try {
+      logger.info('Deploying model', { modelName: req.body.name });
       const result = await registry.deploy(req.body, dataDir);
+      logger.info('Model deployed successfully', { modelName: req.body.name });
       res.status(200).json(result);
     } catch (e) {
       if (e instanceof DeployError) {
+        logger.warn('Deployment validation failed', {
+          modelName: req.body.name,
+          errors: e.errors
+        });
         res.status(400).json({ errors: e.errors });
         return;
       }
-      // 想定外は 500。エラーメッセージは漏らさない方針。
+      logger.error('Unexpected deployment error', e instanceof Error ? e : new Error(String(e)));
       res.status(500).json({ error: 'internal error' });
     }
   });
@@ -60,25 +69,53 @@ export function createApp(options: AppOptions = {}): {
   // メタ API: デプロイ済みモデルの定義更新 (再デプロイ・データ保持)
   app.put('/meta/models/:name', async (req, res) => {
     try {
+      logger.info('Updating model definition', { modelName: req.params.name });
       const updated = await registry.updateModel(req.params.name, req.body, dataDir);
       if (!updated) {
+        logger.warn('Model update failed - model not found', { modelName: req.params.name });
         res.status(404).json({ errors: ['model not found'] });
         return;
       }
+      logger.info('Model definition updated successfully', { modelName: req.params.name });
       res.json({ model: updated });
     } catch (e) {
       if (e instanceof DeployError) {
+        logger.warn('Model update validation failed', {
+          modelName: req.params.name,
+          errors: e.errors
+        });
         res.status(400).json({ errors: e.errors });
         return;
       }
+      logger.error('Unexpected model update error', e instanceof Error ? e : new Error(String(e)));
       res.status(500).json({ error: 'internal error' });
     }
   });
 
   // メタ API: デプロイ済みモデルを削除
   app.delete('/meta/models/:name', (_req, res) => {
+    logger.info('Deleting model', { modelName: _req.params.name });
     const removed = registry.removeModel(_req.params.name);
-    res.status(removed ? 204 : 404).end();
+    if (removed) {
+      logger.info('Model deleted successfully', { modelName: _req.params.name });
+      res.status(204).end();
+    } else {
+      logger.warn('Model deletion failed - model not found', { modelName: _req.params.name });
+      res.status(404).end();
+    }
+  });
+
+  // ログ受信エンドポイント (クライアントログの記録)
+  app.post('/meta/logs', (req, res) => {
+    const { level, message, data, error, stack } = req.body;
+    logger.info('Client log received', {
+      level,
+      message,
+      data,
+      error,
+      stack
+    });
+    res.status(200).json({ status: 'ok' });
   });
 
   // E2E テスト用エコーエンドポイント (本番でも害は無いが必要なら NODE_ENV で切り分け)
@@ -92,16 +129,18 @@ export function createApp(options: AppOptions = {}): {
   // E2E テスト用: 全モデルを削除しデータファイルも消す。
   // これがないと前のテストで作ったレコードが次のテストに紛れ込む。
   app.post('/test/reset', async (_req, res) => {
-    for (const m of registry.list()) registry.removeModel(m.name);
+    logger.info('Resetting test environment');
     try {
+      for (const m of registry.list()) registry.removeModel(m.name);
       const entries = await fsp.readdir(dataDir);
       await Promise.all(
         entries
           .filter((n) => n.endsWith('.json'))
           .map((n) => fsp.rm(path.join(dataDir, n), { force: true })),
       );
-    } catch {
-      // ディレクトリが無い場合は無視
+      logger.info('Test environment reset completed');
+    } catch (e) {
+      logger.error('Error during test reset', e instanceof Error ? e : new Error(String(e)));
     }
     res.status(204).end();
   });
