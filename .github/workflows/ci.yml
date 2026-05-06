@@ -23,6 +23,10 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Build all packages
+        # client は E2E 時に root '/' で配信するため VITE_BASE で base path を上書き。
+        # (deploy.yml は env を設定しないので、GitHub Pages 用の '/modeler/' を維持)
+        env:
+          VITE_BASE: '/'
         run: |
           npm run build --workspace=shared
           npm run build --workspace=server

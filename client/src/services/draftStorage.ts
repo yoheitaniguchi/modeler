@@ -1,5 +1,4 @@
 import type { ModelDefinitionDocument } from '@modeler/shared';
-import { validateDocument } from '@modeler/shared';
 
 /**
  * モデル設計の作業内容を localStorage に保持するサービス。
@@ -46,8 +45,16 @@ export function loadDraft(): ModelDefinitionDocument | null {
     clearDraft();
     return null;
   }
-  const result = validateDocument(parsed);
-  if (!result.ok) {
+  // 下書きは編集途中の状態 (0 フィールド・名前未入力など) も許す。
+  // デプロイ時の厳格な validateDocument は通さず、最低限の structural check だけ行う。
+  // (validateDocument は fields.length >= 1 を要求するが、ユーザはまさにそこへ
+  //  入力する途中で離席する可能性があり、その状態の下書きを失う方が UX が悪い)
+  if (!parsed || typeof parsed !== 'object') {
+    clearDraft();
+    return null;
+  }
+  const doc = parsed as { version?: unknown; models?: unknown };
+  if (doc.version !== 1 || !Array.isArray(doc.models)) {
     clearDraft();
     return null;
   }

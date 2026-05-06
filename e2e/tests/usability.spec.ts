@@ -13,8 +13,12 @@ test.describe('ユーザビリティ機能', () => {
     const api = await newApiContext();
     await resetDeployedModels(api);
     await api.dispose();
-    // 各テスト間で localStorage の下書きが混ざらないようクリア
-    await page.addInitScript(() => {
+    // 各テスト間で localStorage の下書きが混ざらないようクリア。
+    // addInitScript は毎回のページロード (= 後続の page.reload() でも) に走ってしまい
+    // 下書きテストで保存したばかりの draft を消してしまうので、初回 goto 後に
+    // 1 回だけ evaluate でクリアする方式に変える。
+    await page.goto('/');
+    await page.evaluate(() => {
       try { window.localStorage.clear(); } catch {}
     });
   });
