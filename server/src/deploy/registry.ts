@@ -68,6 +68,45 @@ export class DeployRegistry {
   }
 
   /**
+   * デプロイ済みモデル 1 つを別の定義で差し替える。
+   * - 同名モデルがなければ false を返す。
+   * - 既存データファイルは保持。Router を作り直して current を再構築。
+   * - フィールド削除/型変更時もデータは消さず、既存値はそのまま。
+   *   (validateRecord は更新時のみ走るので、リスト取得は影響なし)
+   */
+  async updateModel(
+    name: string,
+    updated: ModelDefinition,
+    dataDir: string,
+  ): Promise<ModelDefinition | null> {
+    const idx = this.deployed.findIndex((m) => m.name === name);
+    if (idx === -1) return null;
+
+    const validation = validateDocument({ version: 1, models: [updated] });
+    if (!validation.ok) {
+      throw new DeployError(validation.errors);
+    }
+    if (updated.name !== name) {
+      throw new DeployError(['model.name does not match path']);
+    }
+
+    const { router, ready } = createCrudRouter(updated, dataDir);
+    await ready;
+
+    this.routerMap.set(name, router);
+    this.deployed = this.deployed.map((m, i) => (i === idx ? updated : m));
+
+    // current を再構築 (順序維持)
+    const next = express.Router();
+    for (const model of this.deployed) {
+      const r = this.routerMap.get(model.name);
+      if (r) next.use(`/${model.name}`, r);
+    }
+    this.current = next;
+    return updated;
+  }
+
+  /**
    * デプロイ済みモデルを 1 つ削除する。
    * routerMap から削除し、残りモデルで this.current を再構築する。
    * データファイルは残す。

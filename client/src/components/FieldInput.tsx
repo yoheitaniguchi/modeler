@@ -14,7 +14,14 @@ export function FieldInput({
   value: unknown;
   onChange: (v: unknown) => void;
 }) {
-  const common = { placeholder: field.label } as const;
+  // 必須フィールドは placeholder に「*」を付与し、aria-required を立てる。
+  // ラベル列を持たない CRUD フォーム上でも視覚的に必須を伝えるための簡易表現。
+  const placeholder = field.required ? `${field.label} *` : field.label;
+  const common = {
+    placeholder,
+    'aria-required': field.required || undefined,
+    'data-required': field.required ? 'true' : undefined,
+  } as const;
 
   // optionsUrl が設定されている場合、selectbox として描画
   if (field.type === 'string' && field.optionsUrl) {
@@ -56,8 +63,10 @@ export function FieldInput({
             type="checkbox"
             checked={Boolean(value)}
             onChange={(e) => onChange(e.target.checked)}
+            aria-required={field.required || undefined}
           />{' '}
           {field.label}
+          {field.required && <span className="required-mark" aria-hidden="true"> *</span>}
         </label>
       );
   }
@@ -76,7 +85,7 @@ function SelectField({
   value: unknown;
   onChange: (v: unknown) => void;
 }) {
-  const [options, setOptions] = useState<Array<{ id: string; label: string }>[]>([]);
+  const [options, setOptions] = useState<Array<{ id: string; label: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

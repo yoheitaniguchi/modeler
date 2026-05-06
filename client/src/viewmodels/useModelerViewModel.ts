@@ -1,9 +1,11 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FieldDefinition, FieldType, ModelDefinition, ModelDefinitionDocument } from '@modeler/shared';
 import { validateDocument } from '@modeler/shared';
 import type { ApiClient } from '../services/api.js';
 import { ApiError } from '../services/api.js';
 import { parse, serialize } from '../services/jsonIo.js';
+import { clearDraft, hasDraft, loadDraft, saveDraft } from '../services/draftStorage.js';
+import { useHistory } from '../hooks/useHistory.js';
 
 /**
  * MVVM の ViewModel。
@@ -18,6 +20,9 @@ import { parse, serialize } from '../services/jsonIo.js';
  *   - View は表示と入力ハンドリングに専念できる
  *
  * これが「View にロジックを書かない」という MVVM の利点を React で素直に実現する形。
+ *
+ * Undo/Redo とローカル下書き保存は本フックで一元管理する。Undo は useHistory に
+ * 委譲、ドラフトは document 変更時に debounce して localStorage へ書き込む。
  */
 
 export interface ModelerViewModel {
@@ -28,6 +33,7 @@ export interface ModelerViewModel {
   addModel: () => void;
   removeModel: (index: number) => void;
   updateModel: (index: number, patch: Partial<ModelDefinition>) => void;
+  replaceModel: (index: number, next: ModelDefinition) => void;
 
   addField: (modelIndex: number) => void;
   removeField: (modelIndex: number, fieldIndex: number) => void;
@@ -36,6 +42,18 @@ export interface ModelerViewModel {
   exportJson: () => string | null;
   importJson: (text: string) => boolean;
   deploy: () => Promise<boolean>;
+
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+
+  /** ローカルストレージに前回の下書きが残っているか。復元バナーの表示判定用。 */
+  draftAvailable: boolean;
+  /** 下書きを document に復元する。成功すれば true。 */
+  restoreDraft: () => boolean;
+  /** 下書きを破棄する。バナーを閉じる用途。 */
+  discardDraft: () => void;
 }
 
 const emptyDoc: ModelDefinitionDocument = { version: 1, models: [] };
@@ -54,18 +72,34 @@ const newModel = (): ModelDefinition => ({
   fields: [newField()],
 });
 
+/** 自動保存の間隔。短すぎると localStorage への書き込みが頻発し、長すぎると喪失リスクが増える。 */
+const DRAFT_DEBOUNCE_MS = 400;
+
 export function useModelerViewModel(api: ApiClient): ModelerViewModel {
-  const [document, setDocument] = useState<ModelDefinitionDocument>(emptyDoc);
+  const history = useHistory<ModelDefinitionDocument>(emptyDoc);
   const [errors, setErrors] = useState<string[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
+  const [draftAvailable, setDraftAvailable] = useState<boolean>(() => hasDraft());
+
+  // document 更新時に debounce で下書き保存。models が空のときは saveDraft が削除側で動く。
+  const document = history.state;
+  const skipFirstSaveRef = useRef(true);
+  useEffect(() => {
+    if (skipFirstSaveRef.current) {
+      skipFirstSaveRef.current = false;
+      return;
+    }
+    const id = setTimeout(() => saveDraft(document), DRAFT_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [document]);
 
   // 「副作用なしの純粋関数で次状態を作って setState」というパターンを徹底。
-  // こうすると useState の関数型更新で済み、レースコンディションが起きにくい。
+  // こうすると history.set の関数型更新で済み、レースコンディションが起きにくい。
   const updateModels = useCallback(
     (mutator: (models: ModelDefinition[]) => ModelDefinition[]) => {
-      setDocument((prev) => ({ ...prev, models: mutator(prev.models) }));
+      history.set((prev) => ({ ...prev, models: mutator(prev.models) }));
     },
-    [],
+    [history],
   );
 
   const addModel = useCallback(() => {
@@ -82,6 +116,13 @@ export function useModelerViewModel(api: ApiClient): ModelerViewModel {
   const updateModel = useCallback(
     (index: number, patch: Partial<ModelDefinition>) => {
       updateModels((m) => m.map((model, i) => (i === index ? { ...model, ...patch } : model)));
+    },
+    [updateModels],
+  );
+
+  const replaceModel = useCallback(
+    (index: number, next: ModelDefinition) => {
+      updateModels((m) => m.map((model, i) => (i === index ? next : model)));
     },
     [updateModels],
   );
@@ -144,7 +185,8 @@ export function useModelerViewModel(api: ApiClient): ModelerViewModel {
   const importJson = useCallback((text: string): boolean => {
     try {
       const doc = parse(text);
-      setDocument(doc);
+      // import はユーザの意図的な切替なので履歴をリセット。
+      history.reset(doc);
       setErrors([]);
       setNotice('JSON を読み込みました');
       return true;
@@ -153,7 +195,7 @@ export function useModelerViewModel(api: ApiClient): ModelerViewModel {
       setNotice(null);
       return false;
     }
-  }, []);
+  }, [history]);
 
   const deploy = useCallback(async (): Promise<boolean> => {
     const result = validateDocument(document);
@@ -178,6 +220,24 @@ export function useModelerViewModel(api: ApiClient): ModelerViewModel {
     }
   }, [api, document]);
 
+  const restoreDraft = useCallback((): boolean => {
+    const draft = loadDraft();
+    if (!draft) {
+      setDraftAvailable(false);
+      return false;
+    }
+    history.reset(draft);
+    setDraftAvailable(false);
+    setErrors([]);
+    setNotice('下書きを復元しました');
+    return true;
+  }, [history]);
+
+  const discardDraft = useCallback(() => {
+    clearDraft();
+    setDraftAvailable(false);
+  }, []);
+
   return {
     document,
     errors,
@@ -185,12 +245,20 @@ export function useModelerViewModel(api: ApiClient): ModelerViewModel {
     addModel,
     removeModel,
     updateModel,
+    replaceModel,
     addField,
     removeField,
     updateField,
     exportJson,
     importJson,
     deploy,
+    undo: history.undo,
+    redo: history.redo,
+    canUndo: history.canUndo,
+    canRedo: history.canRedo,
+    draftAvailable,
+    restoreDraft,
+    discardDraft,
   };
 }
 

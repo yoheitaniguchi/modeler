@@ -46,3 +46,77 @@ th { background: #f3f4f6; }
 .errors ul { margin: 0; padding-left: 1.2rem; }
 .notice { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; padding: 0.5rem; border-radius: 4px; }
 .muted { color: #666; font-size: 0.85rem; }
+
+/* 検索バー */
+.search-bar {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+.search-bar input[type=search] {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 0.95rem;
+}
+.advanced-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  gap: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px dashed #d1d5db;
+  margin-top: 0.4rem;
+}
+.filter-row { padding: 0.2rem 0; }
+
+/* モーダル */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+}
+.modal {
+  background: white; border-radius: 8px; padding: 1.2rem;
+  min-width: 18rem; max-width: 36rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+
+/* 画面定義エディタ */
+.ui-config-editor details, .buttons-editor details {
+  border: 1px solid #e5e7eb; border-radius: 4px; padding: 0.4rem 0.6rem; margin-top: 0.4rem;
+  background: #fafafa;
+}
+.ui-config-editor summary, .buttons-editor summary { cursor: pointer; }
+
+/* ヘルプアイコン (HelpTip) */
+.help-tip {
+  display: inline-block;
+  width: 1.05rem; height: 1.05rem; line-height: 1.05rem;
+  text-align: center; border-radius: 50%;
+  background: #e5e7eb; color: #4b5563;
+  font-size: 0.7rem; font-weight: 700;
+  margin-left: 0.25rem;
+  cursor: help;
+  user-select: none;
+  vertical-align: middle;
+}
+.help-tip:hover, .help-tip:focus { background: #d1d5db; outline: none; }
+
+/* インライン (即時) バリデーションメッセージ */
+.inline-error {
+  color: #b91c1c;
+  font-size: 0.75rem;
+  margin-top: 0.15rem;
+}
+input[aria-invalid="true"] { border-color: #f87171; }
+
+/* 必須フィールドの印 (FieldInput 内 boolean 表示用) */
+.required-mark { color: #dc2626; font-weight: 700; }
+
+/* ボタンの disabled 状態を ghost 系にも適用 */
+button.ghost:disabled, button.danger:disabled {
+  opacity: 0.5; cursor: not-allowed;
+}

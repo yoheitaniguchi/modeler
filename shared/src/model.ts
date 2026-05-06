@@ -30,6 +30,41 @@ export interface FieldDefinition {
   optionsUrl?: string;
 }
 
+/** ボタンが行う動作。 */
+export type ButtonAction =
+  | { kind: 'builtin'; op: 'create' | 'update' | 'edit' | 'delete' }
+  | {
+      kind: 'http';
+      method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+      url: string;
+      /** リクエストボディの雛形 (JSON 文字列)。`{{field}}` を行データの値で置換する。 */
+      bodyTemplate?: string;
+      /** 押下時の確認メッセージ。 */
+      confirmMessage?: string;
+      /** レスポンスを新規タブで開くか。 */
+      openResponseInNewTab?: boolean;
+    };
+
+/** カスタム/上書き対象ボタンの定義。 */
+export interface ButtonDefinition {
+  /** モデル内で一意な識別子。 */
+  id: string;
+  /** UI 上の表示ラベル。 */
+  label: string;
+  /** 'row'=各行ごと / 'screen'=画面ヘッダ */
+  scope: 'row' | 'screen';
+  /** 押下時の動作。 */
+  action: ButtonAction;
+  /** ボタンスタイル。 */
+  style?: 'primary' | 'danger' | 'ghost';
+}
+
+/** 既存ボタン (作成/更新/削除) の URL 上書き設定。 */
+export interface BuiltinButtonOverride {
+  url: string;
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+}
+
 /** モデル単位での UI 設定。 */
 export interface ModelUiConfig {
   /** 一覧画面のタイトル。未設定ならモデル.label を使う。 */
@@ -44,6 +79,14 @@ export interface ModelUiConfig {
   cancelButtonLabel?: string;
   /** 検索ボタンのラベル。 */
   searchButtonLabel?: string;
+  /** 追加カスタムボタン / 既存ボタン上書き含むボタン定義。 */
+  buttons?: ButtonDefinition[];
+  /** 既存 CRUD ボタン (作成/更新/削除) の送信先 URL を差し替える。 */
+  builtinButtonOverrides?: {
+    create?: BuiltinButtonOverride;
+    update?: BuiltinButtonOverride;
+    delete?: BuiltinButtonOverride;
+  };
 }
 
 /** 1 つのモデル (テーブル相当) の定義。 */

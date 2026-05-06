@@ -147,6 +147,77 @@ describe('app', () => {
     expect(res.status).toBe(404);
   });
 
+  it('PUT /meta/models/:name でフィールド追加した再デプロイができ、データは保持', async () => {
+    await request(app).post('/meta/deploy').send(document);
+    // create some data
+    const created = await request(app)
+      .post('/api/customer')
+      .send({ name: '太郎', age: 30 });
+    const id = created.body.id as string;
+
+    // update model: 新フィールド `email` (optional) を追加
+    const updated = {
+      name: 'customer',
+      label: '顧客 v2',
+      fields: [
+        { name: 'name', label: '氏名', type: 'string', required: true },
+        { name: 'age', label: '年齢', type: 'number', required: false },
+        { name: 'email', label: 'メール', type: 'string', required: false },
+      ],
+    };
+    const upd = await request(app).put('/meta/models/customer').send(updated);
+    expect(upd.status).toBe(200);
+    expect(upd.body.model.label).toBe('顧客 v2');
+
+    // データは残っているはず
+    const got = await request(app).get(`/api/customer/${id}`);
+    expect(got.status).toBe(200);
+    expect(got.body.name).toBe('太郎');
+
+    // /meta/models にも新ラベルが反映
+    const list = await request(app).get('/meta/models');
+    expect(list.body.models[0].label).toBe('顧客 v2');
+    expect(list.body.models[0].fields).toHaveLength(3);
+  });
+
+  it('PUT /meta/models/:name で path と body の name 不一致は 400', async () => {
+    await request(app).post('/meta/deploy').send(document);
+    const res = await request(app).put('/meta/models/customer').send({
+      name: 'product',
+      label: 'X',
+      fields: [{ name: 'a', label: 'A', type: 'string', required: true }],
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('PUT で存在しないモデルは 404', async () => {
+    const res = await request(app).put('/meta/models/nonexistent').send(document.models[0]);
+    expect(res.status).toBe(404);
+  });
+
+  it('PUT で不正なモデル定義は 400', async () => {
+    await request(app).post('/meta/deploy').send(document);
+    const res = await request(app).put('/meta/models/customer').send({
+      name: 'customer',
+      label: '',
+      fields: [],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.errors.length).toBeGreaterThan(0);
+  });
+
+  it('/test/echo は POST/GET 両方とも動く (E2E ヘルパ用)', async () => {
+    const p = await request(app).post('/test/echo').send({ hello: 'world' });
+    expect(p.status).toBe(200);
+    expect(p.body.method).toBe('POST');
+    expect(p.body.body).toEqual({ hello: 'world' });
+
+    const g = await request(app).get('/test/echo?x=1');
+    expect(g.status).toBe(200);
+    expect(g.body.method).toBe('GET');
+    expect(g.body.query).toEqual({ x: '1' });
+  });
+
   it('DELETE 後もデータファイルは残る', async () => {
     // deploy して create
     await request(app).post('/meta/deploy').send(document);

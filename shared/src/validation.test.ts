@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateDocument, validateRecord } from './validation.js';
+import { isValidIdentifier, validateDocument, validateRecord } from './validation.js';
 import type { ModelDefinition, ModelDefinitionDocument } from './model.js';
 
 /**
@@ -167,6 +167,119 @@ describe('validateDocument', () => {
       ],
     };
     expect(validateDocument(withUi)).toEqual({ ok: true });
+  });
+
+  it('ButtonDefinition (http) を許容する', () => {
+    const doc: ModelDefinitionDocument = {
+      version: 1,
+      models: [
+        {
+          name: 'order',
+          label: '注文',
+          ui: {
+            buttons: [
+              {
+                id: 'notify',
+                label: '通知',
+                scope: 'row',
+                style: 'primary',
+                action: { kind: 'http', method: 'POST', url: '/notify/{{id}}', bodyTemplate: '{}' },
+              },
+              {
+                id: 'export',
+                label: 'エクスポート',
+                scope: 'screen',
+                action: { kind: 'http', method: 'GET', url: '/export' },
+              },
+            ],
+            builtinButtonOverrides: {
+              create: { url: '/external/create', method: 'POST' },
+            },
+          },
+          fields: [{ name: 'status', label: 'ステータス', type: 'string', required: true }],
+        },
+      ],
+    };
+    expect(validateDocument(doc)).toEqual({ ok: true });
+  });
+
+  it('ButtonDefinition の id 重複を弾く', () => {
+    const doc = {
+      version: 1,
+      models: [
+        {
+          name: 'order',
+          label: '注文',
+          ui: {
+            buttons: [
+              { id: 'a', label: 'A', scope: 'row', action: { kind: 'http', method: 'GET', url: '/a' } },
+              { id: 'a', label: 'A2', scope: 'row', action: { kind: 'http', method: 'GET', url: '/a2' } },
+            ],
+          },
+          fields: [{ name: 'status', label: 'S', type: 'string', required: true }],
+        },
+      ],
+    };
+    const r = validateDocument(doc);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors.some((e) => e.includes('duplicated'))).toBe(true);
+  });
+
+  it('http ボタンで url が空なら弾く', () => {
+    const doc = {
+      version: 1,
+      models: [
+        {
+          name: 'order',
+          label: '注文',
+          ui: {
+            buttons: [
+              { id: 'a', label: 'A', scope: 'row', action: { kind: 'http', method: 'POST', url: '' } },
+            ],
+          },
+          fields: [{ name: 'status', label: 'S', type: 'string', required: true }],
+        },
+      ],
+    };
+    const r = validateDocument(doc);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors.some((e) => e.includes('action.url'))).toBe(true);
+  });
+
+  it('builtinButtonOverrides の method 不正を弾く', () => {
+    const doc = {
+      version: 1,
+      models: [
+        {
+          name: 'order',
+          label: '注文',
+          ui: {
+            builtinButtonOverrides: {
+              create: { url: '/x', method: 'BOGUS' },
+            },
+          },
+          fields: [{ name: 'status', label: 'S', type: 'string', required: true }],
+        },
+      ],
+    };
+    const r = validateDocument(doc);
+    expect(r.ok).toBe(false);
+  });
+});
+
+describe('isValidIdentifier', () => {
+  it.each([
+    ['a', true],
+    ['customer', true],
+    ['user_name', true],
+    ['fieldA1', true],
+    ['', false],
+    ['1leading', false],
+    ['has-dash', false],
+    ['has space', false],
+    ['ふぃーるど', false],
+  ])('isValidIdentifier(%j) -> %s', (input, expected) => {
+    expect(isValidIdentifier(input)).toBe(expected);
   });
 });
 
