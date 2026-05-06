@@ -13,8 +13,7 @@
   "dependencies": {
     "@modeler/shared": "*",
     "cors": "^2.8.5",
-    "express": "^4.19.2",
-    "vite": "8.0.10"
+    "express": "^4.19.2"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
