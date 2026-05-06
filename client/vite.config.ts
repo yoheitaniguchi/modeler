@@ -7,8 +7,11 @@ import react from '@vitejs/plugin-react';
  * proxy でフロントの /api と /meta をローカル Express にそのまま流す。
  * → CORS や baseURL の切替が要らずシンプル。
  */
+// base は GitHub Pages 配信時のサブパス。
+// 本番デプロイ (deploy.yml) ではデフォルトの '/modeler/' を使い、
+// E2E では root '/' から配信したいので VITE_BASE で上書きできるようにする。
 export default defineConfig({
-  base: '/modeler/',
+  base: process.env.VITE_BASE ?? '/modeler/',
   plugins: [react()],
   server: {
     port: 5173,

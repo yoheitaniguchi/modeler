@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateDocument, validateRecord } from './validation.js';
+import { isValidIdentifier, validateDocument, validateRecord } from './validation.js';
 import type { ModelDefinition, ModelDefinitionDocument } from './model.js';
 
 /**
@@ -264,6 +264,22 @@ describe('validateDocument', () => {
     };
     const r = validateDocument(doc);
     expect(r.ok).toBe(false);
+  });
+});
+
+describe('isValidIdentifier', () => {
+  it.each([
+    ['a', true],
+    ['customer', true],
+    ['user_name', true],
+    ['fieldA1', true],
+    ['', false],
+    ['1leading', false],
+    ['has-dash', false],
+    ['has space', false],
+    ['ふぃーるど', false],
+  ])('isValidIdentifier(%j) -> %s', (input, expected) => {
+    expect(isValidIdentifier(input)).toBe(expected);
   });
 });
 

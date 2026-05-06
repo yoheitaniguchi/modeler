@@ -19,14 +19,16 @@ export default defineConfig({
   testDir: './tests',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  retries: process.env.CI ? 1 : 0,
   workers: 1,
   reporter: process.env.CI
     ? [['list'], ['github'], ['html', { open: 'never' }]]
     : 'list',
-  // 個々のテストはせいぜい数秒〜10秒程度で終わるはず
-  timeout: 60_000,
-  expect: { timeout: 10_000 },
+  // 個々のテストはせいぜい数秒〜10秒程度で終わるはず。
+  // タイムアウトを 30 秒に絞ることで、本来通るはずのテストが万一固まったときに
+  // 失敗を早く検出できる (60 秒だと CI 全体の遅延要因になりうる)。
+  timeout: 30_000,
+  expect: { timeout: 5_000 },
 
   use: {
     baseURL: 'http://localhost:4000',
