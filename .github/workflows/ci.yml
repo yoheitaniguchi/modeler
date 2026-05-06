@@ -22,6 +22,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm install
+      - name: Install native Linux binaries for Rollup/Esbuild (bypass Windows lockfile pruning)
+        run: npm install @rollup/rollup-linux-x64-gnu @esbuild/linux-x64
       - name: Build all packages
         # client は E2E 時に root '/' で配信するため VITE_BASE で base path を上書き。
         # (deploy.yml は env を設定しないので、GitHub Pages 用の '/modeler/' を維持)

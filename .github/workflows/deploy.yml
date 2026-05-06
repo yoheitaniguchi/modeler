@@ -24,6 +24,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm install
+      - name: Install native Linux binaries for Rollup/Esbuild (bypass Windows lockfile pruning)
+        run: npm install @rollup/rollup-linux-x64-gnu @esbuild/linux-x64
       - run: npm run build --workspace=shared
       - run: npm run build --workspace=client
       - uses: actions/upload-artifact@v4
