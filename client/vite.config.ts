@@ -11,7 +11,7 @@ import react from '@vitejs/plugin-react';
 // 本番デプロイ (deploy.yml) ではデフォルトの '/modeler/' を使い、
 // E2E では root '/' から配信したいので VITE_BASE で上書きできるようにする。
 export default defineConfig({
-  base: process.env.VITE_BASE ?? '/modeler/',
+  base: '',
   plugins: [react()],
   server: {
     port: 5173,

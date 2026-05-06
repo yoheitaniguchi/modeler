@@ -119,6 +119,7 @@ export function createApp(options: AppOptions = {}): {
     path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'client', 'dist');
   if (existsSync(clientDistDir)) {
     app.use(express.static(clientDistDir));
+    app.use('/modeler', express.static(clientDistDir));
     // SPA フォールバック: 既知の API パスでない GET は index.html を返す
     app.get(/^\/(?!api|meta|test|health).*/, async (_req, res, next) => {
       try {
