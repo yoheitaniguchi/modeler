@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import type { ModelDefinition } from '@modeler/shared';
-import { parseBulkImport } from '@modeler/shared';
+import { formatErrorLog, parseBulkImport } from '@modeler/shared';
 import type { BulkImportResult } from '@modeler/shared';
 import type { ApiClient } from '../services/api.js';
 
@@ -18,7 +18,7 @@ type Format = 'csv' | 'tsv' | 'json';
  *   - フォーマット (CSV / TSV / JSON) 選択
  *   - ファイル選択 → クライアント側バリデーション
  *   - エラー行の一覧表示 + TSV ログのダウンロード
- *   - 全行 OK の場合のみ「登録」ボタンが有効化される
+ *   - 有効な行が1件以上あれば「登録」ボタンが有効化される (部分成功対応)
  */
 export function BulkImportModal({
   open,
@@ -75,15 +75,22 @@ export function BulkImportModal({
 
   /** 「登録」ボタン: 検証済みファイルをサーバーへ POST (1回のみ) */
   const handleImport = async () => {
-    if (!file || !validation?.ok) return;
+    if (!file || !validation || validation.records.length === 0) return;
     setImporting(true);
     setServerError(null);
     try {
       const res = await api.bulkImport(model.name, file, format);
       if (res.rowErrors && res.rowErrors.length > 0) {
-        // サーバー側で弾かれた場合 (通常は起きないが念のため)
-        setServerError(`サーバーエラー: ${res.rowErrors.map((e) => `行${e.row} ${e.field}: ${e.message}`).join(', ')}`);
-        return;
+        // サーバーサイドでのエラー（一意制約など）が含まれる場合、それをUIに反映して部分成功を通知する
+        setValidation({
+          parseError: res.parseError || undefined,
+          records: [], // 登録済みなのでクライアントの有効レコードリストは空にする
+          rowErrors: res.rowErrors,
+        });
+        if (res.imported && res.imported > 0) {
+          onImported(); // 成功した行がある場合は一覧を更新
+        }
+        return; // モーダルは開いたままにしてエラーログをダウンロードできるようにする
       }
       onImported();
       handleClose();
@@ -100,10 +107,8 @@ export function BulkImportModal({
   };
 
   const downloadErrorLog = () => {
-    if (!validation || validation.ok) return;
-    const header = '行番号\tフィールド\tエラー内容';
-    const rows = validation.rowErrors.map((e) => `${e.row}\t${e.field}\t${e.message}`);
-    const log = [header, ...rows].join('\n');
+    if (!validation || validation.rowErrors.length === 0) return;
+    const log = formatErrorLog(validation.rowErrors, model);
     const blob = new Blob([log], { type: 'text/tab-separated-values;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -113,9 +118,9 @@ export function BulkImportModal({
     URL.revokeObjectURL(url);
   };
 
-  const hasErrors = validation !== null && !validation.ok;
-  const recordCount = validation?.ok ? validation.records.length : 0;
-  const canImport = validation?.ok === true && recordCount > 0 && !importing;
+  const hasErrors = validation !== null && validation.rowErrors.length > 0;
+  const recordCount = validation ? validation.records.length : 0;
+  const canImport = validation !== null && recordCount > 0 && !importing;
 
   const acceptMap: Record<Format, string> = {
     csv: '.csv',
@@ -191,14 +196,14 @@ export function BulkImportModal({
         )}
 
         {/* 成功メッセージ */}
-        {validation?.ok && (
+        {validation && recordCount > 0 && (
           <div className="bulk-import-success" data-testid="bulk-validation-ok">
-            ✅ {recordCount} 件のデータが有効です。「登録」ボタンで取り込みを確定してください。
+            ✅ {recordCount} 件のデータが有効です。「登録」ボタンで取り込みを実行してください。
           </div>
         )}
 
-        {/* クライアントサイドバリデーションエラー */}
-        {hasErrors && !validation.ok && (
+        {/* クライアントサイド・サーバーサイドバリデーションエラー */}
+        {hasErrors && (
           <div className="bulk-import-errors" data-testid="bulk-validation-errors">
             {validation.parseError && (
               <p className="bulk-import-parse-error" data-testid="bulk-parse-error">

@@ -15,12 +15,21 @@ export interface RowError {
   field: string;
   /** エラーメッセージ */
   message: string;
+  /** 元のレコードデータ (エラーログ出力用) */
+  recordData?: Record<string, unknown>;
+}
+
+export interface ParsedRecord {
+  row: number;
+  data: Record<string, unknown>;
 }
 
 /** 一括インポートのパース・バリデーション結果 */
-export type BulkImportResult =
-  | { ok: true; records: Omit<ModelRecord, 'id'>[] }
-  | { ok: false; rowErrors: RowError[]; parseError?: string };
+export interface BulkImportResult {
+  parseError?: string;
+  records: ParsedRecord[];
+  rowErrors: RowError[];
+}
 
 /**
  * テキスト文字列をデリミタで分割する。
@@ -113,7 +122,7 @@ export function parseBulkImport(
     if (format === 'json') {
       const parsed = JSON.parse(text);
       if (!Array.isArray(parsed)) {
-        return { ok: false, rowErrors: [], parseError: 'JSON のルートは配列である必要があります' };
+        return { records: [], rowErrors: [], parseError: 'JSON のルートは配列である必要があります' };
       }
       rawRows = parsed as Record<string, unknown>[];
     } else {
@@ -122,6 +131,10 @@ export function parseBulkImport(
       // 文字列値を型変換
       rawRows = strRows.map((row) => {
         const out: Record<string, unknown> = {};
+        // keep string values for all fields to avoid losing unmapped ones in error log
+        for (const key of Object.keys(row)) {
+          out[key] = row[key];
+        }
         for (const field of model.fields) {
           if (field.name in row) {
             out[field.name] = castValue(row[field.name] as string, field.type);
@@ -132,47 +145,80 @@ export function parseBulkImport(
     }
   } catch (e) {
     return {
-      ok: false,
+      records: [],
       rowErrors: [],
       parseError: `パースエラー: ${e instanceof Error ? e.message : String(e)}`,
     };
   }
 
   if (rawRows.length === 0) {
-    return { ok: false, rowErrors: [], parseError: 'データ行が 0 件です' };
+    return { records: [], rowErrors: [], parseError: 'データ行が 0 件です' };
   }
 
   // --- バリデーション ---
   const rowErrors: RowError[] = [];
+  const records: ParsedRecord[] = [];
 
   rawRows.forEach((row, idx) => {
-    const result = validateRecord(model, row as Record<string, unknown>);
+    const rowNum = idx + 1;
+    const result = validateRecord(model, row);
     if (!result.ok) {
       result.errors.forEach((msg) => {
         // "fieldName: エラーメッセージ" の形式を分解
         const colonIdx = msg.indexOf(':');
         const field = colonIdx !== -1 ? msg.slice(0, colonIdx).trim() : '(unknown)';
         const message = colonIdx !== -1 ? msg.slice(colonIdx + 1).trim() : msg;
-        rowErrors.push({ row: idx + 1, field, message });
+        rowErrors.push({ row: rowNum, field, message, recordData: row });
       });
+    } else {
+      records.push({ row: rowNum, data: row });
     }
   });
 
-  if (rowErrors.length > 0) {
-    return { ok: false, rowErrors };
-  }
-
-  return { ok: true, records: rawRows as Omit<ModelRecord, 'id'>[] };
+  return { records, rowErrors };
 }
 
 /**
  * RowError の配列をログ用テキストに整形する。
  * TSV 形式で「行番号 / フィールド / エラー」を出力する。
  */
-export function formatErrorLog(rowErrors: RowError[]): string {
-  const header = '行番号\tフィールド\tエラー内容';
-  const rows = rowErrors.map((e) => `${e.row}\t${e.field}\t${e.message}`);
-  return [header, ...rows].join('\n');
+export function formatErrorLog(rowErrors: RowError[], model?: ModelDefinition): string {
+  if (!model) {
+    const header = '行番号\tフィールド\tエラー内容';
+    const rows = rowErrors.map((e) => `${e.row}\t${e.field}\t${e.message}`);
+    return [header, ...rows].join('\n');
+  }
+
+  const delimiter = '\t';
+  const dataHeaders = model.fields.map((f) => f.name);
+  const header = ['行番号', ...dataHeaders, '_errors'].join(delimiter);
+
+  // エラーを行ごとにグループ化
+  const grouped = new Map<number, { data: Record<string, unknown>; errors: string[] }>();
+  for (const e of rowErrors) {
+    if (!grouped.has(e.row)) {
+      grouped.set(e.row, { data: e.recordData || {}, errors: [] });
+    }
+    grouped.get(e.row)!.errors.push(`${e.field}: ${e.message}`);
+  }
+
+  const escape = (v: unknown): string => {
+    const s = v === null || v === undefined ? '' : String(v);
+    if (s.includes(delimiter) || s.includes('\n') || s.includes('"')) {
+      return `"${s.replace(/"/g, '""')}"`;
+    }
+    return s;
+  };
+
+  const lines = Array.from(grouped.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([rowNum, g]) => {
+      const dataCols = dataHeaders.map((h) => escape(g.data[h]));
+      const errCol = escape(g.errors.join(', '));
+      return [rowNum, ...dataCols, errCol].join(delimiter);
+    });
+
+  return [header, ...lines].join('\n');
 }
 
 /**

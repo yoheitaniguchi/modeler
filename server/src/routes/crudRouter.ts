@@ -94,37 +94,53 @@ export function createCrudRouter(model: ModelDefinition, dataDir: string): {
     const text = req.file.buffer.toString('utf-8');
     const result = parseBulkImport(text, format as ImportFormat, model);
 
-    if (!result.ok) {
+    if (result.parseError) {
       res.status(422).json({
-        parseError: result.parseError ?? null,
+        parseError: result.parseError,
         rowErrors: result.rowErrors,
-        errorLog: result.rowErrors.length > 0 ? formatErrorLog(result.rowErrors) : null,
+        errorLog: null,
       });
       return;
     }
 
-    // バリデーション OK → 全件登録
     const created = [];
-    const insertErrors: string[] = [];
+    const finalRowErrors = [...result.rowErrors];
+
+    // エラーがなかった行を1件ずつ登録
     for (const record of result.records) {
       try {
-        const r = await dao.create(record as Record<string, unknown>);
+        const r = await dao.create(record.data as Record<string, unknown>);
         created.push(r);
       } catch (e) {
         if (e instanceof DaoValidationError) {
-          insertErrors.push(...e.errors);
+          // 一意制約エラーなどを rowErrors に追加
+          e.errors.forEach((msg) => {
+            const colonIdx = msg.indexOf(':');
+            const field = colonIdx !== -1 ? msg.slice(0, colonIdx).trim() : '(unknown)';
+            const message = colonIdx !== -1 ? msg.slice(colonIdx + 1).trim() : msg;
+            finalRowErrors.push({
+              row: record.row,
+              field,
+              message,
+              recordData: record.data,
+            });
+          });
         } else {
           throw e;
         }
       }
     }
 
-    if (insertErrors.length > 0) {
-      res.status(400).json({ errors: insertErrors });
-      return;
-    }
+    // 行番号順にソート
+    finalRowErrors.sort((a, b) => a.row - b.row);
 
-    res.status(201).json({ imported: created.length, records: created });
+    // 成功したか、部分成功したかに関わらず 200/201 を返し、成功件数とエラー行を返す
+    res.status(200).json({
+      imported: created.length,
+      records: created,
+      rowErrors: finalRowErrors,
+      errorLog: finalRowErrors.length > 0 ? formatErrorLog(finalRowErrors, model) : null,
+    });
   });
 
   // ── 1 件取得 ─────────────────────────────────────────────────────

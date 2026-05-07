@@ -94,7 +94,7 @@ describe('一括インポート / エクスポート API', () => {
         .post('/api/customer/import')
         .field('format', 'csv')
         .attach('file', Buffer.from(csv), { filename: 'data.csv', contentType: 'text/csv' });
-      expect(res.status).toBe(201);
+      expect(res.status).toBe(200);
       expect(res.body.imported).toBe(2);
 
       // 一覧で確認
@@ -108,7 +108,7 @@ describe('一括インポート / エクスポート API', () => {
         .post('/api/customer/import')
         .field('format', 'tsv')
         .attach('file', Buffer.from(tsv), { filename: 'data.tsv', contentType: 'text/plain' });
-      expect(res.status).toBe(201);
+      expect(res.status).toBe(200);
       expect(res.body.imported).toBe(1);
     });
 
@@ -121,23 +121,25 @@ describe('一括インポート / エクスポート API', () => {
           filename: 'data.json',
           contentType: 'application/json',
         });
-      expect(res.status).toBe(201);
+      expect(res.status).toBe(200);
       expect(res.body.imported).toBe(1);
     });
 
-    it('required 違反の行がある場合 422 とエラー行情報を返す', async () => {
+    it('required 違反の行がある場合 200 とエラー行情報を返す (部分成功)', async () => {
       const csv = 'name,age,active\n,30,true\nEve,25,false';
       const res = await request(app)
         .post('/api/customer/import')
         .field('format', 'csv')
         .attach('file', Buffer.from(csv), { filename: 'bad.csv', contentType: 'text/csv' });
-      expect(res.status).toBe(422);
+      expect(res.status).toBe(200);
       expect(res.body.rowErrors).toBeDefined();
       expect(res.body.rowErrors.length).toBeGreaterThan(0);
       expect(res.body.rowErrors[0].row).toBe(1);
       expect(res.body.rowErrors[0].field).toBe('name');
       // エラーログが TSV 形式で含まれる
       expect(res.body.errorLog).toContain('行番号');
+      // Eve は登録成功している
+      expect(res.body.imported).toBe(1);
     });
 
     it('ファイルなしは 400', async () => {
