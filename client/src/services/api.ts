@@ -1,4 +1,19 @@
 import type { ModelDefinition, ModelDefinitionDocument, Record as ModelRecord } from '@modeler/shared';
+import type { RowError } from '@modeler/shared';
+
+/** 一括インポート API のレスポンス型 */
+export interface BulkImportApiResult {
+  /** バリデーション OK で登録された件数 */
+  imported?: number;
+  /** 登録されたレコード */
+  records?: ModelRecord[];
+  /** パースエラーメッセージ */
+  parseError?: string | null;
+  /** 行レベルのバリデーションエラー */
+  rowErrors?: RowError[];
+  /** ダウンロード用エラーログ (TSV テキスト) */
+  errorLog?: string | null;
+}
 
 /**
  * API クライアント。fetch を直接コンポーネントから呼ばず、ここに集約する。
@@ -39,6 +54,14 @@ export interface ApiClient {
   remove(modelName: string, id: string): Promise<void>;
   /** カスタムボタンから任意 URL を呼ぶ。 */
   callCustom(req: CallButtonRequest): Promise<CallButtonResponse>;
+  /** 一括インポート: multipart ファイルを POST し、結果を受け取る。 */
+  bulkImport(
+    modelName: string,
+    file: File,
+    format: 'csv' | 'tsv' | 'json',
+  ): Promise<BulkImportApiResult>;
+  /** 一括エクスポート: 指定フォーマットのファイル URL を返す (fetch して使う)。 */
+  exportUrl(modelName: string, format: 'csv' | 'tsv' | 'json'): string;
 }
 
 export class HttpApiClient implements ApiClient {
@@ -90,6 +113,24 @@ export class HttpApiClient implements ApiClient {
   }
   async remove(modelName: string, id: string) {
     await this.request<void>('DELETE', `/api/${modelName}/${id}`);
+  }
+  async bulkImport(
+    modelName: string,
+    file: File,
+    format: 'csv' | 'tsv' | 'json',
+  ): Promise<BulkImportApiResult> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('format', format);
+    const res = await fetch(`${this.baseUrl}/api/${modelName}/import`, {
+      method: 'POST',
+      body: formData,
+    });
+    const json = await res.json() as BulkImportApiResult;
+    return json;
+  }
+  exportUrl(modelName: string, format: 'csv' | 'tsv' | 'json'): string {
+    return `${this.baseUrl}/api/${modelName}/export?format=${format}`;
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {

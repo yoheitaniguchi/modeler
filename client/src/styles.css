@@ -150,3 +150,112 @@ button.ghost:disabled, button.danger:disabled {
 .field-group select {
   width: 100%;
 }
+
+/* ── 一括インポートモーダル ─────────────────────────────── */
+.bulk-import-modal {
+  min-width: 38rem;
+  max-width: 62rem;
+  width: 92vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.bulk-import-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.bulk-import-close {
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0.25rem 0.5rem;
+}
+.bulk-import-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.bulk-import-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+}
+.bulk-import-format-group {
+  display: flex;
+  gap: 1rem;
+}
+.bulk-import-format-option {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.bulk-import-file-input {
+  font-size: 0.9rem;
+}
+.bulk-import-filename {
+  font-size: 0.8rem;
+}
+.bulk-import-validating {
+  padding: 0.4rem 0;
+}
+.bulk-import-success {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+.bulk-import-errors {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+}
+.bulk-import-parse-error {
+  margin: 0 0 0.4rem;
+  font-weight: 600;
+}
+.bulk-import-error-title {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+.bulk-import-error-table-wrap {
+  max-height: 14rem;
+  overflow-y: auto;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+}
+.bulk-import-error-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+.bulk-import-error-table th,
+.bulk-import-error-table td {
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid #fecaca;
+  text-align: left;
+}
+.bulk-import-error-table th {
+  background: #fee2e2;
+  font-weight: 600;
+}
+.bulk-import-dl-log {
+  margin-top: 0.6rem;
+  font-size: 0.85rem;
+  color: #374151;
+}
+.bulk-import-footer {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+

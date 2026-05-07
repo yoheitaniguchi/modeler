@@ -53,5 +53,12 @@ export function createFakeApi(): ApiClient & { _store: Map<string, ModelRecord[]
       const arr = store.get(name) ?? [];
       store.set(name, arr.filter((r) => r.id !== id));
     },
+    async bulkImport(_modelName, _file, _format) {
+      // テスト用スタブ: 常に 0 件成功を返す
+      return { imported: 0, records: [] };
+    },
+    exportUrl(modelName, format) {
+      return `/api/${modelName}/export?format=${format}`;
+    },
   };
 }

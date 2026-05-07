@@ -18,4 +18,4 @@ e2e/playwright/.cache/
 server/data/
 
 # Local Claude config
-.claude/settings.json
+.claude/settings.*

@@ -9,6 +9,7 @@ import { ApiError } from '../services/api.js';
 import { SearchBar } from '../components/SearchBar.js';
 import { ConfirmDialog } from '../components/ConfirmDialog.js';
 import { RecordFormModal } from '../components/RecordFormModal.js';
+import { BulkImportModal } from '../components/BulkImportModal.js';
 import { useCrudViewModel } from '../viewmodels/useCrudViewModel.js';
 import { buildRequestBody, TemplateError } from '../services/template.js';
 
@@ -30,6 +31,7 @@ export function CrudView({ api, model }: { api: ApiClient; model: ModelDefinitio
   const [modalRecord, setModalRecord] = useState<ModelRecord | null>(null);
   const [modalSaving, setModalSaving] = useState(false);
   const [modalErrors, setModalErrors] = useState<string[]>([]);
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
 
   const overrides = model.ui?.builtinButtonOverrides ?? {};
   const customButtons = model.ui?.buttons ?? [];
@@ -176,6 +178,22 @@ export function CrudView({ api, model }: { api: ApiClient; model: ModelDefinitio
           <button className="primary" onClick={openCreateModal} data-testid="create-button">
             {createLabel}
           </button>
+          <button
+            className="ghost"
+            onClick={() => setBulkImportOpen(true)}
+            data-testid="bulk-import-button"
+          >
+            一括登録
+          </button>
+          <a
+            href={api.exportUrl(model.name, 'tsv')}
+            download
+            className="button ghost"
+            data-testid="export-button"
+            style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem', borderRadius: '4px', border: '1px solid #d1d5db', background: 'white', textDecoration: 'none', display: 'inline-block', cursor: 'pointer' }}
+          >
+            エクスポート
+          </a>
           {screenButtons.map((b) => (
             <button
               key={b.id}
@@ -274,6 +292,14 @@ export function CrudView({ api, model }: { api: ApiClient; model: ModelDefinitio
         errors={modalErrors}
         onSave={handleModalSave}
         onCancel={closeModal}
+      />
+
+      <BulkImportModal
+        open={bulkImportOpen}
+        model={model}
+        api={api}
+        onImported={async () => { await vm.reload(); }}
+        onClose={() => setBulkImportOpen(false)}
       />
     </div>
   );
