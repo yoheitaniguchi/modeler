@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { ModelDefinition, Record as ModelRecord } from '@modeler/shared';
-import { validateRecord } from '@modeler/shared';
+import { validateRecord, formatRecord } from '@modeler/shared';
 
 /**
  * DAO (Data Access Object) — データの読み書きをカプセル化する層。
@@ -42,9 +42,17 @@ export class JsonFileDao {
     }
   }
 
-  async list(): Promise<ModelRecord[]> {
+  private async readAll(): Promise<ModelRecord[]> {
     const raw = await fs.readFile(this.filePath, 'utf-8');
     return JSON.parse(raw) as ModelRecord[];
+  }
+
+  async list(): Promise<ModelRecord[]> {
+    const records = await this.readAll();
+    if (this.model.softDelete) {
+      return records.filter((r) => r._deleted !== true);
+    }
+    return records;
   }
 
   async get(id: string): Promise<ModelRecord | null> {
@@ -53,13 +61,15 @@ export class JsonFileDao {
   }
 
   async create(input: Record<string, unknown>): Promise<ModelRecord> {
-    const validation = validateRecord(this.model, input);
+    const formatted = formatRecord(this.model, input);
+    const validation = validateRecord(this.model, formatted);
     if (!validation.ok) {
       throw new DaoValidationError(validation.errors);
     }
     return this.serialize(async () => {
-      const all = await this.list();
-      const record: ModelRecord = { id: randomUUID(), ...input };
+      const all = await this.readAll();
+      this.checkUniqueConstraints(formatted, all);
+      const record: ModelRecord = { id: randomUUID(), ...formatted };
       all.push(record);
       await this.persist(all);
       return record;
@@ -67,16 +77,20 @@ export class JsonFileDao {
   }
 
   async update(id: string, input: Record<string, unknown>): Promise<ModelRecord | null> {
-    const validation = validateRecord(this.model, input);
+    const formatted = formatRecord(this.model, input);
+    const validation = validateRecord(this.model, formatted);
     if (!validation.ok) {
       throw new DaoValidationError(validation.errors);
     }
     return this.serialize(async () => {
-      const all = await this.list();
+      const all = await this.readAll();
       const idx = all.findIndex((r) => r.id === id);
       if (idx === -1) return null;
-      // id は不変。入力の id を取り回さないように明示的に上書き。
-      all[idx] = { ...input, id };
+      if (this.model.softDelete && all[idx]._deleted) return null; // Cannot update soft-deleted record
+
+      this.checkUniqueConstraints(formatted, all, id);
+      // id, _deleted は不変または上書き禁止
+      all[idx] = { ...formatted, id, _deleted: all[idx]._deleted };
       await this.persist(all);
       return all[idx];
     });
@@ -84,12 +98,43 @@ export class JsonFileDao {
 
   async remove(id: string): Promise<boolean> {
     return this.serialize(async () => {
-      const all = await this.list();
-      const next = all.filter((r) => r.id !== id);
-      if (next.length === all.length) return false;
-      await this.persist(next);
-      return true;
+      const all = await this.readAll();
+      const idx = all.findIndex((r) => r.id === id);
+      if (idx === -1) return false;
+
+      if (this.model.softDelete) {
+        if (all[idx]._deleted) return false; // Already deleted
+        all[idx] = { ...all[idx], _deleted: true };
+        await this.persist(all);
+        return true;
+      } else {
+        const next = all.filter((r) => r.id !== id);
+        if (next.length === all.length) return false;
+        await this.persist(next);
+        return true;
+      }
     });
+  }
+
+  private checkUniqueConstraints(input: Record<string, unknown>, all: ModelRecord[], excludeId?: string): void {
+    const errors: string[] = [];
+    for (const field of this.model.fields) {
+      if (field.validation?.unique) {
+        const val = input[field.name];
+        if (val === undefined || val === null || val === '') continue;
+
+        // If softDelete is enabled, should we allow duplicates with deleted records?
+        // Usually soft deleted records shouldn't block new inserts, but depends on requirements.
+        // For simplicity, let's only check non-deleted records for unique constraint.
+        const dup = all.some(r => r.id !== excludeId && r._deleted !== true && r[field.name] === val);
+        if (dup) {
+          errors.push(`${field.name}: must be unique`);
+        }
+      }
+    }
+    if (errors.length > 0) {
+      throw new DaoValidationError(errors);
+    }
   }
 
   private async persist(records: ModelRecord[]): Promise<void> {

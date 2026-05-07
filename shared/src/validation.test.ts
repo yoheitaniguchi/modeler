@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isValidIdentifier, validateDocument, validateRecord } from './validation.js';
+import { isValidIdentifier, validateDocument, validateRecord, formatRecord } from './validation.js';
 import type { ModelDefinition, ModelDefinitionDocument } from './model.js';
 
 /**
@@ -302,5 +302,58 @@ describe('validateRecord', () => {
   it('型が違うと失敗 (age に文字列)', () => {
     const result = validateRecord(model, { name: '山田', age: 'thirty' });
     expect(result.ok).toBe(false);
+  });
+
+  it('パターン検証 (pattern)', () => {
+    const m: ModelDefinition = {
+      name: 'test',
+      label: 'test',
+      fields: [{ name: 'code', label: 'c', type: 'string', required: false, validation: { pattern: '^\\d{3}$' } }]
+    };
+    expect(validateRecord(m, { code: '123' }).ok).toBe(true);
+    expect(validateRecord(m, { code: '1234' }).ok).toBe(false);
+  });
+
+  it('文字数検証 (minLength, maxLength)', () => {
+    const m: ModelDefinition = {
+      name: 'test',
+      label: 'test',
+      fields: [{ name: 'code', label: 'c', type: 'string', required: false, validation: { minLength: 2, maxLength: 4 } }]
+    };
+    expect(validateRecord(m, { code: '1' }).ok).toBe(false);
+    expect(validateRecord(m, { code: '12' }).ok).toBe(true);
+    expect(validateRecord(m, { code: '1234' }).ok).toBe(true);
+    expect(validateRecord(m, { code: '12345' }).ok).toBe(false);
+  });
+
+  it('数値検証 (min, max)', () => {
+    const m: ModelDefinition = {
+      name: 'test',
+      label: 'test',
+      fields: [{ name: 'age', label: 'a', type: 'number', required: false, validation: { min: 10, max: 20 } }]
+    };
+    expect(validateRecord(m, { age: 9 }).ok).toBe(false);
+    expect(validateRecord(m, { age: 10 }).ok).toBe(true);
+    expect(validateRecord(m, { age: 20 }).ok).toBe(true);
+    expect(validateRecord(m, { age: 21 }).ok).toBe(false);
+  });
+});
+
+describe('formatRecord', () => {
+  it('trim と fullWidthToHalfWidth が適用されること', () => {
+    const m: ModelDefinition = {
+      name: 'test',
+      label: 'テスト',
+      fields: [
+        { name: 'code', label: 'コード', type: 'string', required: false, formatters: { fullWidthToHalfWidth: true, trim: true } },
+        { name: 'memo', label: 'メモ', type: 'string', required: false, formatters: { trim: true } },
+        { name: 'none', label: 'なし', type: 'string', required: false }
+      ]
+    };
+    const input = { code: ' ＡＢＣ１２３ ', memo: '  テスト  ', none: ' ＡＢＣ ' };
+    const result = formatRecord(m, input);
+    expect(result.code).toBe('ABC123');
+    expect(result.memo).toBe('テスト');
+    expect(result.none).toBe(' ＡＢＣ ');
   });
 });

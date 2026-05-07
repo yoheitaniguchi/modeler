@@ -28,7 +28,13 @@ export function FieldInput({
     return <SelectField field={field} value={value} onChange={onChange} />;
   }
 
+  // reference が設定されている場合、外部モデルから selectbox の選択肢を取得する
+  if (field.type === 'reference' && field.targetModel) {
+    return <ReferenceField field={field} value={value} onChange={onChange} />;
+  }
+
   switch (field.type) {
+    case 'reference':
     case 'string':
       return (
         <input
@@ -133,6 +139,79 @@ function SelectField({
         value={(value as string) ?? ''}
         onChange={(e) => onChange(e.target.value)}
         title={`Failed to load options: ${error}`}
+      />
+    );
+  }
+
+  return (
+    <select
+      value={(value as string) ?? ''}
+      onChange={(e) => onChange(e.target.value || undefined)}
+      disabled={loading}
+    >
+      <option value="">-- 選択してください --</option>
+      {options.map((opt) => (
+        <option key={opt.id} value={opt.id}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/**
+ * 参照先の API (/api/:targetModel) からレコード一覧を取得して selectbox として描画する。
+ */
+function ReferenceField({
+  field,
+  value,
+  onChange,
+}: {
+  field: FieldDefinition;
+  value: unknown;
+  onChange: (v: unknown) => void;
+}) {
+  const [options, setOptions] = useState<Array<{ id: string; label: string }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!field.targetModel) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/${field.targetModel}`);
+        if (!res.ok) throw new Error(`${res.status}`);
+        const data = (await res.json()) as Array<Record<string, unknown>>;
+        if (!cancelled) {
+          const opts = data.map((item) => ({
+            id: String(item.id),
+            label: field.targetLabelField ? String(item[field.targetLabelField] ?? item.id) : String(item.id),
+          }));
+          setOptions(opts);
+          setError(null);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(String(e));
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, [field.targetModel, field.targetLabelField]);
+
+  // エラーが出たら text input にフォールバック
+  if (error) {
+    return (
+      <input
+        type="text"
+        placeholder={field.label}
+        value={(value as string) ?? ''}
+        onChange={(e) => onChange(e.target.value)}
+        title={`Failed to load reference: ${error}`}
       />
     );
   }

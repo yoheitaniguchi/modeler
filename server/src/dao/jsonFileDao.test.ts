@@ -79,4 +79,52 @@ describe('JsonFileDao', () => {
     const list = await dao.list();
     expect(list).toHaveLength(5);
   });
+
+  it('softDelete有効時、removeで物理削除されず_deletedフラグが立つ', async () => {
+    const softDao = new JsonFileDao({ ...model, name: 'soft', softDelete: true }, dataDir);
+    await softDao.init();
+    const created = await softDao.create({ name: 'apple', price: 100 });
+    expect(await softDao.list()).toHaveLength(1);
+    
+    expect(await softDao.remove(created.id)).toBe(true);
+    // list() は _deleted:true を除外するので 0件になる
+    expect(await softDao.list()).toHaveLength(0);
+    // ファイルには _deleted:true として残っていることを確認する
+    const raw = await fs.readFile(path.join(dataDir, 'soft.json'), 'utf-8');
+    const allRecords = JSON.parse(raw);
+    expect(allRecords).toHaveLength(1);
+    expect(allRecords[0]._deleted).toBe(true);
+  });
+
+  it('自動フォーマットが適用される', async () => {
+    const formatDao = new JsonFileDao({
+      ...model,
+      name: 'format',
+      fields: [
+        { name: 'code', label: 'C', type: 'string', required: true, formatters: { trim: true, fullWidthToHalfWidth: true } }
+      ]
+    }, dataDir);
+    await formatDao.init();
+    const created = await formatDao.create({ code: ' ＡＢＣ ' });
+    expect(created.code).toBe('ABC');
+  });
+
+  it('ユニーク制約が機能する', async () => {
+    const uniqueDao = new JsonFileDao({
+      ...model,
+      name: 'unique',
+      fields: [
+        { name: 'email', label: 'Email', type: 'string', required: true, validation: { unique: true } }
+      ]
+    }, dataDir);
+    await uniqueDao.init();
+    await uniqueDao.create({ email: 'test@example.com' });
+    
+    // duplicate create
+    await expect(uniqueDao.create({ email: 'test@example.com' })).rejects.toBeInstanceOf(DaoValidationError);
+    
+    const second = await uniqueDao.create({ email: 'other@example.com' });
+    // duplicate update
+    await expect(uniqueDao.update(second.id, { email: 'test@example.com' })).rejects.toBeInstanceOf(DaoValidationError);
+  });
 });

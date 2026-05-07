@@ -16,18 +16,21 @@ const TYPE_MAP: Record<SqlDialect, Record<FieldType, string>> = {
     number: 'DOUBLE PRECISION',
     boolean: 'BOOLEAN',
     date: 'TIMESTAMP',
+    reference: 'TEXT',
   },
   sqlite: {
     string: 'TEXT',
     number: 'NUMERIC',
     boolean: 'INTEGER',
     date: 'TEXT',
+    reference: 'TEXT',
   },
   msaccess: {
     string: 'TEXT',
     number: 'DOUBLE',
     boolean: 'BIT',
     date: 'DATETIME',
+    reference: 'TEXT',
   },
 };
 
@@ -42,6 +45,7 @@ function quoteSqlString(value: string): string {
 function formatDefault(value: unknown, type: FieldType, dialect: SqlDialect): string | null {
   if (value === null || value === undefined) return null;
   switch (type) {
+    case 'reference':
     case 'string':
       return quoteSqlString(String(value));
     case 'number': {

@@ -11,8 +11,24 @@
  *   3. JSON 入出力時のバリデーションが書きやすい (validation.ts 参照)
  */
 
-/** サポートするフィールドの型。要件で string / number / boolean / date のみ。 */
-export type FieldType = 'string' | 'number' | 'boolean' | 'date';
+/** サポートするフィールドの型。要件で string / number / boolean / date に加え、他モデルへの参照 reference を追加。 */
+export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'reference';
+
+/** 高度なバリデーション設定。 */
+export interface FieldValidation {
+  pattern?: string; // 正規表現パターン (string用)
+  minLength?: number; // 最小文字数 (string用)
+  maxLength?: number; // 最大文字数 (string用)
+  min?: number; // 最小値 (number用)
+  max?: number; // 最大値 (number用)
+  unique?: boolean; // ユニーク制約 (重複禁止)
+}
+
+/** 入力フォーマッタ設定。 */
+export interface FieldFormatters {
+  trim?: boolean; // 前後の空白を削除
+  fullWidthToHalfWidth?: boolean; // 全角英数字を半角に変換
+}
 
 /** 1 つのフィールド (テーブルでいうカラム相当) の定義。 */
 export interface FieldDefinition {
@@ -28,6 +44,14 @@ export interface FieldDefinition {
   defaultValue?: unknown;
   /** type='string' フィールドの場合、selectbox の選択肢を取得する API エンドポイント。 */
   optionsUrl?: string;
+  /** type='reference' の場合の参照先モデル名。 */
+  targetModel?: string;
+  /** type='reference' の場合に表示ラベルとして使う参照先モデルのフィールド名。 */
+  targetLabelField?: string;
+  /** バリデーションルール。 */
+  validation?: FieldValidation;
+  /** フォーマッタ設定。 */
+  formatters?: FieldFormatters;
 }
 
 /** ボタンが行う動作。 */
@@ -99,6 +123,8 @@ export interface ModelDefinition {
   fields: FieldDefinition[];
   /** モデル単位での UI 設定。 */
   ui?: ModelUiConfig;
+  /** 論理削除を有効にするか。true の場合削除時に _deleted フラグを立てる。 */
+  softDelete?: boolean;
 }
 
 /**
@@ -118,6 +144,8 @@ export interface ModelDefinitionDocument {
 export interface Record {
   /** DAO が採番する一意な ID。クライアントからは指定しない。 */
   id: string;
+  /** 論理削除フラグ。 */
+  _deleted?: boolean;
   /** その他は ModelDefinition.fields に従う動的フィールド。 */
   [key: string]: unknown;
 }

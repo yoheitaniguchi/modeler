@@ -1,3 +1,4 @@
+import { Fragment, useState } from 'react';
 import type {
   FieldDefinition,
   FieldType,
@@ -20,7 +21,7 @@ import { SqlExportButton } from './SqlExportButton.js';
  * 共有層の `isValidIdentifier` を使ってサーバー側と判定基準を揃える。
  */
 
-const FIELD_TYPES: FieldType[] = ['string', 'number', 'boolean', 'date'];
+const FIELD_TYPES: FieldType[] = ['string', 'number', 'boolean', 'date', 'reference'];
 
 const NAME_HINT = '英字始まり / 英数字とアンダースコアのみ。API パスや DB カラム名に使われます。';
 const TYPE_HINT = 'string / number / boolean / date のいずれか。型を変えるとデフォルト値はクリアされます。';
@@ -41,6 +42,7 @@ export function ModelEditor({
   /** インライン編集時は name を変えないように true にする。 */
   disableNameEdit?: boolean;
 }) {
+  const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const updateModel = (patch: Partial<ModelDefinition>) => {
     onChange({ ...model, ...patch });
   };
@@ -136,7 +138,15 @@ export function ModelEditor({
             )}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '0.4rem' }}>
+        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+          <label style={{ fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.2rem', marginRight: '1rem' }}>
+            <input
+              type="checkbox"
+              checked={model.softDelete ?? false}
+              onChange={(e) => updateModel({ softDelete: e.target.checked })}
+            />
+            論理削除を有効
+          </label>
           <SqlExportButton model={model} />
           {showRemoveModel && onRemoveModel && (
             <button className="danger" onClick={onRemoveModel}>モデル削除</button>
@@ -166,7 +176,8 @@ export function ModelEditor({
           {model.fields.map((field, fi) => {
             const fNameError = fieldNameError(field.name, fi, model.fields);
             return (
-              <tr key={fi}>
+              <Fragment key={fi}>
+                <tr>
                 <td>
                   <input
                     type="text"
@@ -240,6 +251,14 @@ export function ModelEditor({
                 <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                   <button
                     className="ghost"
+                    onClick={() => setExpandedRow(expandedRow === fi ? null : fi)}
+                    title="詳細設定"
+                    aria-label="詳細設定"
+                    data-testid={`field-settings-${fi}`}
+                    style={{ fontSize: '0.85rem', padding: '0.2rem 0.35rem' }}
+                  >⚙️</button>{' '}
+                  <button
+                    className="ghost"
                     onClick={() => moveField(fi, -1)}
                     disabled={fi === 0}
                     title="上に移動"
@@ -271,6 +290,92 @@ export function ModelEditor({
                   >削除</button>
                 </td>
               </tr>
+              {expandedRow === fi && (
+                <tr>
+                  <td colSpan={7} style={{ backgroundColor: '#f9f9f9', padding: '0.8rem', borderBottom: '1px solid #ddd' }}>
+                    <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+                      {field.type === 'reference' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: '200px' }}>
+                          <strong>リレーション設定</strong>
+                          <label style={{ fontSize: '0.85rem' }}>
+                            参照先モデル名 (targetModel)
+                            <input
+                              type="text"
+                              value={field.targetModel ?? ''}
+                              placeholder="e.g. department"
+                              onChange={(e) => updateField(fi, { targetModel: e.target.value })}
+                              style={{ width: '100%', marginTop: '0.2rem' }}
+                            />
+                          </label>
+                          <label style={{ fontSize: '0.85rem' }}>
+                            表示ラベルフィールド (targetLabelField)
+                            <input
+                              type="text"
+                              value={field.targetLabelField ?? ''}
+                              placeholder="e.g. name"
+                              onChange={(e) => updateField(fi, { targetLabelField: e.target.value })}
+                              style={{ width: '100%', marginTop: '0.2rem' }}
+                            />
+                          </label>
+                        </div>
+                      )}
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: '250px' }}>
+                        <strong>バリデーション設定</strong>
+                        {(field.type === 'string' || field.type === 'reference') && (
+                          <>
+                            <label style={{ fontSize: '0.85rem' }}>
+                              正規表現 (pattern)
+                              <input type="text" value={field.validation?.pattern ?? ''} placeholder="^\\d{3}-\\d{4}$" onChange={(e) => updateField(fi, { validation: { ...field.validation, pattern: e.target.value || undefined } })} style={{ width: '100%', marginTop: '0.2rem' }} />
+                            </label>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              <label style={{ fontSize: '0.85rem', flex: 1 }}>
+                                最小文字数
+                                <input type="number" value={field.validation?.minLength ?? ''} onChange={(e) => updateField(fi, { validation: { ...field.validation, minLength: e.target.value ? Number(e.target.value) : undefined } })} style={{ width: '100%', marginTop: '0.2rem' }} />
+                              </label>
+                              <label style={{ fontSize: '0.85rem', flex: 1 }}>
+                                最大文字数
+                                <input type="number" value={field.validation?.maxLength ?? ''} onChange={(e) => updateField(fi, { validation: { ...field.validation, maxLength: e.target.value ? Number(e.target.value) : undefined } })} style={{ width: '100%', marginTop: '0.2rem' }} />
+                              </label>
+                            </div>
+                          </>
+                        )}
+                        {field.type === 'number' && (
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <label style={{ fontSize: '0.85rem', flex: 1 }}>
+                              最小値
+                              <input type="number" value={field.validation?.min ?? ''} onChange={(e) => updateField(fi, { validation: { ...field.validation, min: e.target.value ? Number(e.target.value) : undefined } })} style={{ width: '100%', marginTop: '0.2rem' }} />
+                            </label>
+                            <label style={{ fontSize: '0.85rem', flex: 1 }}>
+                              最大値
+                              <input type="number" value={field.validation?.max ?? ''} onChange={(e) => updateField(fi, { validation: { ...field.validation, max: e.target.value ? Number(e.target.value) : undefined } })} style={{ width: '100%', marginTop: '0.2rem' }} />
+                            </label>
+                          </div>
+                        )}
+                        <label style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.2rem' }}>
+                          <input type="checkbox" checked={field.validation?.unique ?? false} onChange={(e) => updateField(fi, { validation: { ...field.validation, unique: e.target.checked ? true : undefined } })} />
+                          ユニーク制約 (重複禁止)
+                        </label>
+                      </div>
+
+                      {field.type === 'string' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: '200px' }}>
+                          <strong>入力フォーマッタ</strong>
+                          <label style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <input type="checkbox" checked={field.formatters?.trim ?? false} onChange={(e) => updateField(fi, { formatters: { ...field.formatters, trim: e.target.checked ? true : undefined } })} />
+                            前後の空白を自動削除 (trim)
+                          </label>
+                          <label style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <input type="checkbox" checked={field.formatters?.fullWidthToHalfWidth ?? false} onChange={(e) => updateField(fi, { formatters: { ...field.formatters, fullWidthToHalfWidth: e.target.checked ? true : undefined } })} />
+                            全角英数字を半角に変換
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             );
           })}
         </tbody>

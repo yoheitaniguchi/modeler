@@ -22,7 +22,7 @@ export type ValidationResult =
   | { ok: true }
   | { ok: false; errors: string[] };
 
-const FIELD_TYPES: readonly FieldType[] = ['string', 'number', 'boolean', 'date'];
+const FIELD_TYPES: readonly FieldType[] = ['string', 'number', 'boolean', 'date', 'reference'];
 
 /** 識別子は英字始まり + 英数アンダースコア。SQL 予約語っぽい衝突を避ける素朴なルール。 */
 export const IDENTIFIER_PATTERN = /^[a-zA-Z][a-zA-Z0-9_]*$/;
@@ -67,6 +67,54 @@ export function validateFieldDefinition(field: unknown, path: string): string[] 
     }
   }
 
+  // reference 型の場合は targetModel が必須
+  if (f.type === 'reference') {
+    if (typeof f.targetModel !== 'string' || f.targetModel.trim() === '') {
+      errors.push(`${path}.targetModel: must be non-empty string when type is "reference"`);
+    }
+    if (f.targetLabelField !== undefined && (typeof f.targetLabelField !== 'string' || f.targetLabelField.trim() === '')) {
+      errors.push(`${path}.targetLabelField: must be non-empty string when provided`);
+    }
+  }
+
+  if (f.validation) {
+    if (typeof f.validation !== 'object') {
+      errors.push(`${path}.validation: must be an object`);
+    } else {
+      if (f.validation.pattern !== undefined && typeof f.validation.pattern !== 'string') {
+        errors.push(`${path}.validation.pattern: must be string`);
+      }
+      if (f.validation.minLength !== undefined && typeof f.validation.minLength !== 'number') {
+        errors.push(`${path}.validation.minLength: must be number`);
+      }
+      if (f.validation.maxLength !== undefined && typeof f.validation.maxLength !== 'number') {
+        errors.push(`${path}.validation.maxLength: must be number`);
+      }
+      if (f.validation.min !== undefined && typeof f.validation.min !== 'number') {
+        errors.push(`${path}.validation.min: must be number`);
+      }
+      if (f.validation.max !== undefined && typeof f.validation.max !== 'number') {
+        errors.push(`${path}.validation.max: must be number`);
+      }
+      if (f.validation.unique !== undefined && typeof f.validation.unique !== 'boolean') {
+        errors.push(`${path}.validation.unique: must be boolean`);
+      }
+    }
+  }
+
+  if (f.formatters) {
+    if (typeof f.formatters !== 'object') {
+      errors.push(`${path}.formatters: must be an object`);
+    } else {
+      if (f.formatters.trim !== undefined && typeof f.formatters.trim !== 'boolean') {
+        errors.push(`${path}.formatters.trim: must be boolean`);
+      }
+      if (f.formatters.fullWidthToHalfWidth !== undefined && typeof f.formatters.fullWidthToHalfWidth !== 'boolean') {
+        errors.push(`${path}.formatters.fullWidthToHalfWidth: must be boolean`);
+      }
+    }
+  }
+
   return errors;
 }
 
@@ -80,6 +128,10 @@ function validateDefaultValue(type: FieldType, value: unknown): string | null {
       return typeof value === 'boolean' ? null : 'must be boolean';
     case 'date':
       return typeof value === 'string' && !Number.isNaN(Date.parse(value)) ? null : 'must be ISO date string';
+    case 'reference':
+      return typeof value === 'string' ? null : 'must be string ID';
+    default:
+      return 'unknown type';
   }
 }
 
@@ -293,11 +345,42 @@ export function validateRecord(
 
     switch (field.type) {
       case 'string':
-        if (typeof value !== 'string') errors.push(`${field.name}: must be string`);
+      case 'reference': // reference も基本は ID なので string
+        if (typeof value !== 'string') {
+          errors.push(`${field.name}: must be string`);
+        } else {
+          if (field.validation) {
+            if (field.validation.minLength !== undefined && value.length < field.validation.minLength) {
+              errors.push(`${field.name}: must be at least ${field.validation.minLength} characters`);
+            }
+            if (field.validation.maxLength !== undefined && value.length > field.validation.maxLength) {
+              errors.push(`${field.name}: must be at most ${field.validation.maxLength} characters`);
+            }
+            if (field.validation.pattern) {
+              try {
+                const regex = new RegExp(field.validation.pattern);
+                if (!regex.test(value)) {
+                  errors.push(`${field.name}: must match pattern ${field.validation.pattern}`);
+                }
+              } catch (e) {
+                // invalid regex
+              }
+            }
+          }
+        }
         break;
       case 'number':
         if (typeof value !== 'number' || Number.isNaN(value)) {
           errors.push(`${field.name}: must be number`);
+        } else {
+          if (field.validation) {
+            if (field.validation.min !== undefined && value < field.validation.min) {
+              errors.push(`${field.name}: must be at least ${field.validation.min}`);
+            }
+            if (field.validation.max !== undefined && value > field.validation.max) {
+              errors.push(`${field.name}: must be at most ${field.validation.max}`);
+            }
+          }
         }
         break;
       case 'boolean':
@@ -312,4 +395,35 @@ export function validateRecord(
     }
   }
   return errors.length === 0 ? { ok: true } : { ok: false, errors };
+}
+
+/**
+ * 保存前にレコードの入力値を自動フォーマット（クレンジング）する。
+ * trim や 全角半角変換 などを適用した新しいレコードオブジェクトを返す。
+ */
+export function formatRecord(
+  model: ModelDefinition,
+  record: Record<string, unknown>
+): Record<string, unknown> {
+  const formatted: Record<string, unknown> = { ...record };
+
+  for (const field of model.fields) {
+    if (!field.formatters) continue;
+    let value = formatted[field.name];
+
+    if (typeof value === 'string') {
+      let strVal = value;
+      if (field.formatters.fullWidthToHalfWidth) {
+        strVal = strVal.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) =>
+          String.fromCharCode(s.charCodeAt(0) - 0xfee0)
+        );
+      }
+      if (field.formatters.trim) {
+        strVal = strVal.trim();
+      }
+      formatted[field.name] = strVal;
+    }
+  }
+
+  return formatted;
 }
