@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { deployCustomer, gotoDeployedTab, newApiContext, resetDeployedModels } from './helpers.js';
+import { deployCustomer, gotoUserMode, newApiContext, resetDeployedModels } from './helpers.js';
 
 test.describe('CRUD 画面', () => {
   test.beforeEach(async () => {
@@ -10,8 +10,8 @@ test.describe('CRUD 画面', () => {
   });
 
   test('レコードの作成・編集・削除ができる', async ({ page }) => {
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
     await expect(page.getByTestId('crud-title')).toBeVisible();
 
     // 作成

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { deployCustomer, gotoDeployedTab, newApiContext, resetDeployedModels } from './helpers.js';
+import { deployCustomer, gotoUserMode, newApiContext, resetDeployedModels } from './helpers.js';
 
 test.describe('RecordFormModal - 詳細編集モーダル', () => {
   test.beforeEach(async () => {
@@ -10,8 +10,8 @@ test.describe('RecordFormModal - 詳細編集モーダル', () => {
   });
 
   test('「作成」ボタンをクリックするとモーダルが開く', async ({ page }) => {
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
 
     await page.getByTestId('create-button').click();
     await expect(page.getByTestId('record-form-modal')).toBeVisible();
@@ -21,8 +21,8 @@ test.describe('RecordFormModal - 詳細編集モーダル', () => {
   });
 
   test('「更新」ボタンをクリックするとモーダルが開き、レコードデータが表示される', async ({ page }) => {
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
 
     // 先にレコードを作成
     await page.getByTestId('create-button').click();
@@ -42,8 +42,8 @@ test.describe('RecordFormModal - 詳細編集モーダル', () => {
   });
 
   test('必須フィールドのラベルが赤色で表示される', async ({ page }) => {
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
 
     await page.getByTestId('create-button').click();
     await expect(page.getByTestId('record-form-modal')).toBeVisible();
@@ -57,8 +57,8 @@ test.describe('RecordFormModal - 詳細編集モーダル', () => {
   });
 
   test('非必須フィールドのラベルが通常色で表示される', async ({ page }) => {
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
 
     await page.getByTestId('create-button').click();
     await expect(page.getByTestId('record-form-modal')).toBeVisible();
@@ -72,8 +72,8 @@ test.describe('RecordFormModal - 詳細編集モーダル', () => {
   });
 
   test('「登録して閉じる」でモーダルが閉じて一覧に反映される', async ({ page }) => {
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
 
     await page.getByTestId('create-button').click();
     await page.getByPlaceholder('氏名 *').fill('Bob');
@@ -89,8 +89,8 @@ test.describe('RecordFormModal - 詳細編集モーダル', () => {
   });
 
   test('「登録してもう一件登録する」でモーダルが開いたままになり、複数件作成できる', async ({ page }) => {
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
 
     // 1件目を作成
     await page.getByTestId('create-button').click();
@@ -115,8 +115,8 @@ test.describe('RecordFormModal - 詳細編集モーダル', () => {
   });
 
   test('キャンセルボタンでモーダルが閉じる', async ({ page }) => {
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
 
     await page.getByTestId('create-button').click();
     await page.getByPlaceholder('氏名 *').fill('Eve');
@@ -131,8 +131,8 @@ test.describe('RecordFormModal - 詳細編集モーダル', () => {
   });
 
   test('Escape キーでモーダルが閉じる', async ({ page }) => {
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
 
     await page.getByTestId('create-button').click();
     await expect(page.getByTestId('record-form-modal')).toBeVisible();
@@ -144,8 +144,8 @@ test.describe('RecordFormModal - 詳細編集モーダル', () => {
   });
 
   test('2列レイアウトでフィールドが配置される', async ({ page }) => {
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
 
     await page.getByTestId('create-button').click();
     await expect(page.getByTestId('record-form-modal')).toBeVisible();
@@ -162,8 +162,8 @@ test.describe('RecordFormModal - 詳細編集モーダル', () => {
   });
 
   test('バリデーションエラーがモーダル上部に表示される', async ({ page }) => {
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
 
     // 必須フィールドを空のまま送信
     await page.getByTestId('create-button').click();

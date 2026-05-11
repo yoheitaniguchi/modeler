@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { gotoDeployedTab, newApiContext, resetDeployedModels } from './helpers.js';
+import { gotoUserMode, newApiContext, resetDeployedModels } from './helpers.js';
 
 test.describe('カスタムボタン (REST API 呼び出し)', () => {
   test.beforeEach(async () => {
@@ -43,8 +43,8 @@ test.describe('カスタムボタン (REST API 呼び出し)', () => {
   });
 
   test('画面ボタンを押すと成功通知が出る', async ({ page }) => {
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
     await expect(page.getByTestId('screen-button-echo_screen')).toBeVisible();
 
     await page.getByTestId('screen-button-echo_screen').click();
@@ -52,8 +52,8 @@ test.describe('カスタムボタン (REST API 呼び出し)', () => {
   });
 
   test('行ボタンが行ごとに表示され、押下できる', async ({ page }) => {
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
     await expect(page.getByRole('cell', { name: 'Alice', exact: true })).toBeVisible();
 
     const rowButton = page.getByRole('button', { name: '行ボタン' });

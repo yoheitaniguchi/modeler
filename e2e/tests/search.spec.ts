@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { deployCustomer, gotoDeployedTab, newApiContext, resetDeployedModels } from './helpers.js';
+import { deployCustomer, gotoUserMode, newApiContext, resetDeployedModels } from './helpers.js';
 
 test.describe('検索/フィルタ/ソート', () => {
   test.beforeEach(async () => {
@@ -19,8 +19,8 @@ test.describe('検索/フィルタ/ソート', () => {
   });
 
   test('キーワード検索で絞り込める', async ({ page }) => {
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
     await expect(page.getByTestId('hit-count')).toContainText('5 / 5');
 
     await page.getByTestId('search-keyword').fill('ali');
@@ -29,8 +29,8 @@ test.describe('検索/フィルタ/ソート', () => {
   });
 
   test('詳細検索 (number ≥) が動く', async ({ page }) => {
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
     await expect(page.getByTestId('hit-count')).toContainText('5 / 5');
 
     await page.getByTestId('toggle-advanced').click();
@@ -43,8 +43,8 @@ test.describe('検索/フィルタ/ソート', () => {
   });
 
   test('カラムヘッダクリックでソートできる', async ({ page }) => {
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
     await expect(page.getByTestId('hit-count')).toContainText('5 / 5');
 
     await page.getByTestId('sort-age').click();

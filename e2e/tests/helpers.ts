@@ -12,20 +12,21 @@ export async function newApiContext(): Promise<APIRequestContext> {
   return await request.newContext();
 }
 
-/** 「設計タブ」をアクティブにする。 */
-export async function gotoDesignTab(page: Page) {
+/** 管理者モードに遷移する (サイドバー最上部のトグル)。 */
+export async function gotoAdminMode(page: Page) {
   await page.goto('/');
-  // SPA の bootstrap が終わってタブが見えるまで待つ
-  const tab = page.getByRole('tab', { name: /モデル設計/ });
-  await tab.waitFor({ state: 'visible' });
-  await tab.click();
+  const btn = page.getByTestId('mode-admin');
+  await btn.waitFor({ state: 'visible' });
+  await btn.click();
 }
 
-export async function gotoDeployedTab(page: Page) {
+/** ユーザーモード (マスター管理) に遷移し、サイドバーのモデルリストが読み込まれるまで待つ。 */
+export async function gotoUserMode(page: Page) {
   await page.goto('/');
-  const tab = page.getByRole('tab', { name: /デプロイ済みモデル/ });
-  await tab.waitFor({ state: 'visible' });
-  await tab.click();
+  const btn = page.getByTestId('mode-user');
+  await btn.waitFor({ state: 'visible' });
+  await btn.click();
+  await page.getByTestId('deployed-model-list').waitFor({ state: 'visible' });
 }
 
 /**

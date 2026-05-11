@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { deployCustomer, gotoDeployedTab, newApiContext, resetDeployedModels } from './helpers.js';
+import { deployCustomer, gotoUserMode, newApiContext, resetDeployedModels } from './helpers.js';
 
 test.describe('デプロイ済みモデルのインライン編集/削除', () => {
   test.beforeEach(async () => {
@@ -13,8 +13,8 @@ test.describe('デプロイ済みモデルのインライン編集/削除', () =
   });
 
   test('フィールド追加してもデータが保持される', async ({ page }) => {
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
     await page.getByTestId('edit-deployed').click();
     await expect(page.getByTestId('inline-model-editor')).toBeVisible();
 
@@ -38,8 +38,8 @@ test.describe('デプロイ済みモデルのインライン編集/削除', () =
   });
 
   test('モデル削除すると一覧から消える', async ({ page }) => {
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
     await page.getByTestId('delete-deployed').click();
     await expect(page.getByTestId('confirm-dialog')).toBeVisible();
     await page.getByTestId('confirm-ok').click();
