@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { ModelDefinition } from '@modeler/shared';
 import type { UiMode } from '../services/uiPrefs.js';
 import { ModelRowKebab } from './ModelRowKebab.js';
@@ -49,8 +50,23 @@ export function Sidebar({
   onDeployedSelect,
   deployedLoading = false,
 }: SidebarProps) {
+  const [isMinimized, setIsMinimized] = useState(false);
+
   return (
-    <aside className="sidebar" data-testid="sidebar">
+    <aside className={`sidebar ${isMinimized ? 'is-minimized' : ''}`} data-testid="sidebar">
+      <div className="sidebar-header" style={{ display: 'flex', justifyContent: isMinimized ? 'center' : 'flex-end', paddingBottom: '0.2rem' }}>
+        <button
+          type="button"
+          className="burger-menu-btn"
+          onClick={() => setIsMinimized(!isMinimized)}
+          data-testid="sidebar-toggle-minimize"
+          title={isMinimized ? "サイドバーを展開" : "サイドバーを最小化"}
+          aria-label={isMinimized ? "サイドバーを展開" : "サイドバーを最小化"}
+        >
+          ☰
+        </button>
+      </div>
+
       <div className="mode-toggle" role="tablist" aria-label="モード切替">
         <button
           role="tab"

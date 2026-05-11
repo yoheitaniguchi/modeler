@@ -49,6 +49,15 @@ export function ModelEditor({
   showRemoveModel = true,
   disableNameEdit = false,
   knownModelNames,
+  showAdminToolbar = false,
+  onUndo,
+  onRedo,
+  onSaveJson,
+  onLoadJson,
+  onDeploy,
+  canUndo = false,
+  canRedo = false,
+  canDeploy = false,
 }: {
   model: ModelDefinition;
   onChange: (next: ModelDefinition) => void;
@@ -58,6 +67,15 @@ export function ModelEditor({
   disableNameEdit?: boolean;
   /** 参照先候補のモデル名一覧。指定すると targetModel が select になり、未知名の警告も出る。 */
   knownModelNames?: string[];
+  showAdminToolbar?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  onSaveJson?: () => void;
+  onLoadJson?: () => void;
+  onDeploy?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  canDeploy?: boolean;
 }) {
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [collapsed, setCollapsed] = useState<boolean>(false);
@@ -192,6 +210,57 @@ export function ModelEditor({
           <SqlExportButton model={model} />
           {showRemoveModel && onRemoveModel && (
             <button className="danger" onClick={onRemoveModel}>モデル削除</button>
+          )}
+          {showAdminToolbar && (
+            <>
+              <button
+                type="button"
+                className="ghost"
+                onClick={onUndo}
+                disabled={!canUndo}
+                data-testid="undo"
+                title="元に戻す (Ctrl+Z)"
+              >
+                ⟲ 元に戻す
+              </button>
+              <button
+                type="button"
+                className="ghost"
+                onClick={onRedo}
+                disabled={!canRedo}
+                data-testid="redo"
+                title="やり直す (Ctrl+Shift+Z)"
+              >
+                ⟳ やり直す
+              </button>
+              <button
+                type="button"
+                className="ghost"
+                onClick={onSaveJson}
+                data-testid="save-json"
+                title="JSON 保存 (Ctrl+S)"
+              >
+                JSON 保存
+              </button>
+              <button
+                type="button"
+                className="ghost"
+                onClick={onLoadJson}
+                data-testid="load-json"
+                title="JSON 読込 (Ctrl+O)"
+              >
+                JSON 読込
+              </button>
+              <button
+                type="button"
+                className="primary"
+                onClick={onDeploy}
+                disabled={!canDeploy}
+                data-testid="deploy"
+              >
+                デプロイ
+              </button>
+            </>
           )}
         </div>
       </div>
