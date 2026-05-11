@@ -11,20 +11,166 @@ body { margin: 0; padding: 0; }
 
 .container { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
 header.top {
-  background: #0f172a; color: white; padding: 1rem 1.5rem;
+  background: #0f172a; color: white; padding: 0.85rem 1.5rem;
   display: flex; align-items: center; justify-content: space-between;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  gap: 1rem;
 }
+header.top .top-left { display: flex; align-items: baseline; gap: 0.6rem; }
 header.top h1 { font-size: 1.25rem; margin: 0; font-weight: 700; background: linear-gradient(to right, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+header.top .header-toolbar { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 
-.tabs { display: flex; gap: 0.5rem; border-bottom: 1px solid #e2e8f0; margin-bottom: 1.5rem; }
-.tabs button {
-  background: transparent; border: none; padding: 0.6rem 1.2rem; cursor: pointer;
-  border-bottom: 2px solid transparent; font-weight: 500; color: #64748b;
-  transition: all 0.2s ease;
+/* ── アプリケーションシェル ───────────────────────────── */
+.app-shell { display: flex; flex-direction: column; min-height: 100vh; }
+.shell-body { display: flex; flex: 1; min-height: 0; }
+
+/* ── サイドバー ─────────────────────────────────── */
+.sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  background: #f1f5f9;
+  border-right: 1px solid #e2e8f0;
+  padding: 1rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  overflow-y: auto;
 }
-.tabs button:hover { color: #0f172a; }
-.tabs button.active { border-bottom-color: #2563eb; color: #2563eb; font-weight: 600; }
+.mode-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #e2e8f0;
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+.mode-toggle button {
+  background: transparent;
+  border: none;
+  padding: 0.45rem 0.6rem;
+  border-radius: 6px;
+  font-weight: 500;
+  color: #475569;
+  font-size: 0.9rem;
+}
+.mode-toggle button.active {
+  background: white;
+  color: #1e293b;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.sidebar-section { display: flex; flex-direction: column; gap: 0.6rem; }
+.sidebar-heading {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  margin: 0.4rem 0 0;
+}
+.sidebar-add { width: 100%; text-align: left; }
+.sidebar-empty { margin: 0; padding: 0.4rem 0.2rem; }
+.sidebar-draft { font-size: 0.85rem; }
+
+.model-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 2px; }
+.model-list-item {
+  border-radius: 6px;
+  border-left: 3px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.model-list-item.is-selected {
+  border-left-color: #2563eb;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.model-link {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 0.5rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  font-size: 0.9rem;
+  color: #1e293b;
+  border-radius: 6px;
+}
+.model-link:hover { background: rgba(37, 99, 235, 0.06); }
+.model-list-item.is-selected .model-link { color: #1e3a8a; font-weight: 600; }
+.model-link-label { display: block; }
+.model-link-sub { display: block; font-size: 0.75rem; color: #64748b; font-weight: 400; }
+
+/* ── 行アクションケバブ ────────────────────────────── */
+.row-kebab-wrap { position: relative; flex-shrink: 0; }
+.row-kebab {
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #475569;
+  padding: 0.2rem 0.45rem;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.row-kebab:hover { background: rgba(0, 0, 0, 0.05); color: #0f172a; }
+.row-kebab[aria-expanded="true"] { background: rgba(0, 0, 0, 0.08); }
+.row-kebab-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 0.2rem;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+  z-index: 20;
+  min-width: 9rem;
+  padding: 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.row-kebab-menuitem {
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 0.4rem 0.65rem;
+  border-radius: 4px;
+  font-size: 0.88rem;
+  color: #1e293b;
+}
+.row-kebab-menuitem:hover:not(:disabled) { background: #f1f5f9; }
+.row-kebab-menuitem:disabled { color: #94a3b8; cursor: not-allowed; }
+
+.reorder-hint {
+  font-size: 0.72rem;
+  margin: 0.6rem 0 0;
+  padding: 0 0.2rem;
+  line-height: 1.4;
+}
+
+/* ── メインペイン ──────────────────────────────── */
+.main-pane {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 1.5rem 2rem;
+}
+.model-designer { max-width: 1100px; }
+
+/* ── 狭幅対応 (≥1024px は常時展開、未満はオーバーレイ) ────────── */
+@media (max-width: 1023px) {
+  .sidebar {
+    position: fixed;
+    top: 0; bottom: 0; left: 0;
+    z-index: 50;
+    box-shadow: 4px 0 12px rgba(0, 0, 0, 0.1);
+  }
+}
 
 button { cursor: pointer; font-family: inherit; transition: all 0.2s ease; }
 button:active { transform: scale(0.97); }

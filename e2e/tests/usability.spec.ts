@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { gotoDesignTab, newApiContext, resetDeployedModels } from './helpers.js';
+import { gotoAdminMode, gotoUserMode, newApiContext, resetDeployedModels } from './helpers.js';
 
 /**
  * Tier 1 ユーザビリティ機能の主要 E2E。
@@ -24,7 +24,7 @@ test.describe('ユーザビリティ機能', () => {
   });
 
   test('下書きが localStorage に保存され、リロード後に復元できる', async ({ page }) => {
-    await gotoDesignTab(page);
+    await gotoAdminMode(page);
 
     await page.getByTestId('add-model').click();
     const card = page.locator('.card').filter({ hasText: 'モデル名' }).first();
@@ -41,7 +41,7 @@ test.describe('ユーザビリティ機能', () => {
 
     // ページリロード — 編集中の models は消えるが下書きは残る
     await page.reload();
-    await page.getByRole('tab', { name: /モデル設計/ }).click();
+    await page.getByTestId('mode-admin').click();
 
     // 復元バナーが見える
     await expect(page.getByTestId('draft-banner')).toBeVisible();
@@ -55,7 +55,7 @@ test.describe('ユーザビリティ機能', () => {
   });
 
   test('Undo / Redo ボタンで編集を行き来できる', async ({ page }) => {
-    await gotoDesignTab(page);
+    await gotoAdminMode(page);
 
     await page.getByTestId('add-model').click();
     const card = page.locator('.card').filter({ hasText: 'モデル名' }).first();
@@ -74,7 +74,7 @@ test.describe('ユーザビリティ機能', () => {
   });
 
   test('フィールドを ↓ ボタンで並び替えできる', async ({ page }) => {
-    await gotoDesignTab(page);
+    await gotoAdminMode(page);
 
     await page.getByTestId('add-model').click();
     const card = page.locator('.card').filter({ hasText: 'モデル名' }).first();
@@ -95,7 +95,7 @@ test.describe('ユーザビリティ機能', () => {
   });
 
   test('フィールド複製ボタンで _copy 付きの行が増える', async ({ page }) => {
-    await gotoDesignTab(page);
+    await gotoAdminMode(page);
 
     await page.getByTestId('add-model').click();
     const card = page.locator('.card').filter({ hasText: 'モデル名' }).first();
@@ -109,7 +109,7 @@ test.describe('ユーザビリティ機能', () => {
   });
 
   test('不正なフィールド名はインラインエラーで指摘される', async ({ page }) => {
-    await gotoDesignTab(page);
+    await gotoAdminMode(page);
 
     await page.getByTestId('add-model').click();
     const card = page.locator('.card').filter({ hasText: 'モデル名' }).first();
@@ -119,19 +119,19 @@ test.describe('ユーザビリティ機能', () => {
     await expect(page.getByTestId('field-name-error-0')).toBeVisible();
   });
 
-  test('モデル設計タブとデプロイ済みモデルタブを切り替えても画面の内容がクリアされない', async ({ page }) => {
-    await gotoDesignTab(page);
+  test('管理者モードとユーザーモードを切り替えても画面の内容がクリアされない', async ({ page }) => {
+    await gotoAdminMode(page);
 
     await page.getByTestId('add-model').click();
     const card = page.locator('.card').filter({ hasText: 'モデル名' }).first();
     await card.getByPlaceholder('customer').fill('temporary-tab-switch');
     await card.getByPlaceholder('顧客').fill('タブ切替一時');
 
-    // 「デプロイ済みモデル」タブに切り替える
-    await page.getByRole('tab', { name: /デプロイ済みモデル/ }).click();
+    // ユーザーモードへ切替
+    await gotoUserMode(page);
 
-    // 「モデル設計」タブに戻る
-    await page.getByRole('tab', { name: /モデル設計/ }).click();
+    // 管理者モードに戻る
+    await gotoAdminMode(page);
 
     // 内容が消えていないことを確認
     await expect(card.getByPlaceholder('customer')).toHaveValue('temporary-tab-switch');

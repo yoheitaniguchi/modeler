@@ -44,6 +44,6 @@ test.describe('デプロイ済みモデルのインライン編集/削除', () =
     await expect(page.getByTestId('confirm-dialog')).toBeVisible();
     await page.getByTestId('confirm-ok').click();
 
-    await expect(page.getByText('まだデプロイされたモデルがありません')).toBeVisible();
+    await expect(page.getByText('デプロイされたモデルがありません').first()).toBeVisible();
   });
 });

@@ -3,7 +3,7 @@ import type { FieldDefinition, FieldType, ModelDefinition, ModelDefinitionDocume
 import { validateDocument } from '@modeler/shared';
 import type { ApiClient } from '../services/api.js';
 import { ApiError } from '../services/api.js';
-import { parse, serialize } from '../services/jsonIo.js';
+import { parse, serialize, stripClientFields } from '../services/jsonIo.js';
 import { clearDraft, hasDraft, loadDraft, saveDraft } from '../services/draftStorage.js';
 import { useHistory } from '../hooks/useHistory.js';
 
@@ -34,6 +34,8 @@ export interface ModelerViewModel {
   removeModel: (index: number) => void;
   updateModel: (index: number, patch: Partial<ModelDefinition>) => void;
   replaceModel: (index: number, next: ModelDefinition) => void;
+  /** モデルの並び順を変える (from 番目を to 番目へ)。範囲外や同位置は no-op。undo 可能。 */
+  moveModel: (from: number, to: number) => void;
 
   addField: (modelIndex: number) => void;
   removeField: (modelIndex: number, fieldIndex: number) => void;
@@ -54,6 +56,11 @@ export interface ModelerViewModel {
   restoreDraft: () => boolean;
   /** 下書きを破棄する。バナーを閉じる用途。 */
   discardDraft: () => void;
+
+  /** 現在選択されているモデルの __clientId。未選択なら null。 */
+  selectedKey: string | null;
+  /** 選択を変更する。null で「未選択」。 */
+  select: (key: string | null) => void;
 }
 
 const emptyDoc: ModelDefinitionDocument = { version: 1, models: [] };
@@ -66,10 +73,24 @@ const newField = (): FieldDefinition => ({
   defaultValue: undefined,
 });
 
+const newClientId = (): string =>
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `cid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
 const newModel = (): ModelDefinition => ({
   name: '',
   label: '',
   fields: [newField()],
+  __clientId: newClientId(),
+});
+
+/** インポート/復元したドキュメントの全モデルに __clientId を割り当てる (なければ)。 */
+const ensureClientIds = (doc: ModelDefinitionDocument): ModelDefinitionDocument => ({
+  ...doc,
+  models: doc.models.map((m) =>
+    m.__clientId ? m : { ...m, __clientId: newClientId() },
+  ),
 });
 
 /** 自動保存の間隔。短すぎると localStorage への書き込みが頻発し、長すぎると喪失リスクが増える。 */
@@ -80,6 +101,7 @@ export function useModelerViewModel(api: ApiClient): ModelerViewModel {
   const [errors, setErrors] = useState<string[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [draftAvailable, setDraftAvailable] = useState<boolean>(() => hasDraft());
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   // document 更新時に debounce で下書き保存。models が空のときは saveDraft が削除側で動く。
   const document = history.state;
@@ -103,12 +125,15 @@ export function useModelerViewModel(api: ApiClient): ModelerViewModel {
   );
 
   const addModel = useCallback(() => {
-    updateModels((m) => [...m, newModel()]);
+    const m = newModel();
+    updateModels((ms) => [...ms, m]);
+    setSelectedKey(m.__clientId ?? null);
   }, [updateModels]);
 
   const removeModel = useCallback(
     (index: number) => {
       updateModels((m) => m.filter((_, i) => i !== index));
+      // 削除後に selectedKey が無効になっていれば useEffect 側で null に解決される
     },
     [updateModels],
   );
@@ -122,9 +147,31 @@ export function useModelerViewModel(api: ApiClient): ModelerViewModel {
 
   const replaceModel = useCallback(
     (index: number, next: ModelDefinition) => {
-      updateModels((m) => m.map((model, i) => (i === index ? next : model)));
+      // 呼び出し側 (ModelEditor) は __clientId を意識しないので、既存のものを保つ
+      updateModels((m) =>
+        m.map((model, i) =>
+          i === index ? { ...next, __clientId: model.__clientId ?? next.__clientId } : model,
+        ),
+      );
     },
     [updateModels],
+  );
+
+  const moveModel = useCallback(
+    (from: number, to: number) => {
+      // 履歴を汚さないため no-op はここで弾く (updateModels はスプレッドで新オブジェクトを作るため)
+      if (from === to) return;
+      history.set((prev) => {
+        const m = prev.models;
+        if (from < 0 || from >= m.length) return prev;
+        if (to < 0 || to >= m.length) return prev;
+        const next = m.slice();
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, moved);
+        return { ...prev, models: next };
+      });
+    },
+    [history],
   );
 
   const addField = useCallback(
@@ -186,7 +233,14 @@ export function useModelerViewModel(api: ApiClient): ModelerViewModel {
     try {
       const doc = parse(text);
       // import はユーザの意図的な切替なので履歴をリセット。
-      history.reset(doc);
+      // 取り込んだ JSON には __clientId が無いので付与する。
+      const withIds = ensureClientIds(doc);
+      history.reset(withIds);
+      if (withIds.models.length > 0) {
+        setSelectedKey(withIds.models[0].__clientId ?? null);
+      } else {
+        setSelectedKey(null);
+      }
       setErrors([]);
       setNotice('JSON を読み込みました');
       return true;
@@ -205,7 +259,8 @@ export function useModelerViewModel(api: ApiClient): ModelerViewModel {
       return false;
     }
     try {
-      await api.deploy(document);
+      // __clientId はサーバーに送らない
+      await api.deploy(stripClientFields(document));
       setErrors([]);
       setNotice('デプロイしました');
       return true;
@@ -226,7 +281,14 @@ export function useModelerViewModel(api: ApiClient): ModelerViewModel {
       setDraftAvailable(false);
       return false;
     }
-    history.reset(draft);
+    // 旧バージョンの下書きには __clientId が無い可能性があるので保険で付与。
+    const withIds = ensureClientIds(draft);
+    history.reset(withIds);
+    if (withIds.models.length > 0) {
+      setSelectedKey(withIds.models[0].__clientId ?? null);
+    } else {
+      setSelectedKey(null);
+    }
     setDraftAvailable(false);
     setErrors([]);
     setNotice('下書きを復元しました');
@@ -238,6 +300,17 @@ export function useModelerViewModel(api: ApiClient): ModelerViewModel {
     setDraftAvailable(false);
   }, []);
 
+  const select = useCallback((key: string | null) => {
+    setSelectedKey(key);
+  }, []);
+
+  // 選択中モデルが削除/インポートで消えたら null に戻す
+  useEffect(() => {
+    if (selectedKey === null) return;
+    const stillExists = document.models.some((m) => m.__clientId === selectedKey);
+    if (!stillExists) setSelectedKey(null);
+  }, [document, selectedKey]);
+
   return {
     document,
     errors,
@@ -246,6 +319,7 @@ export function useModelerViewModel(api: ApiClient): ModelerViewModel {
     removeModel,
     updateModel,
     replaceModel,
+    moveModel,
     addField,
     removeField,
     updateField,
@@ -259,6 +333,8 @@ export function useModelerViewModel(api: ApiClient): ModelerViewModel {
     draftAvailable,
     restoreDraft,
     discardDraft,
+    selectedKey,
+    select,
   };
 }
 

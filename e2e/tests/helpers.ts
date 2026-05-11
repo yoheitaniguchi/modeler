@@ -14,7 +14,9 @@ export async function newApiContext(): Promise<APIRequestContext> {
 
 /** 管理者モードに遷移する (サイドバー最上部のトグル)。 */
 export async function gotoAdminMode(page: Page) {
-  await page.goto('/');
+  if (page.url() === 'about:blank') {
+    await page.goto('/');
+  }
   const btn = page.getByTestId('mode-admin');
   await btn.waitFor({ state: 'visible' });
   await btn.click();
@@ -22,11 +24,13 @@ export async function gotoAdminMode(page: Page) {
 
 /** ユーザーモード (マスター管理) に遷移し、サイドバーのモデルリストが読み込まれるまで待つ。 */
 export async function gotoUserMode(page: Page) {
-  await page.goto('/');
+  if (page.url() === 'about:blank') {
+    await page.goto('/');
+  }
   const btn = page.getByTestId('mode-user');
   await btn.waitFor({ state: 'visible' });
   await btn.click();
-  await page.getByTestId('deployed-model-list').waitFor({ state: 'visible' });
+  await page.getByTestId('sidebar-user').waitFor({ state: 'visible' });
 }
 
 /**

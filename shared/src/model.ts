@@ -151,6 +151,11 @@ export interface ModelDefinition {
   ui?: ModelUiConfig;
   /** 論理削除を有効にするか。true の場合削除時に _deleted フラグを立てる。 */
   softDelete?: boolean;
+  /**
+   * クライアント内部用の安定 ID (UUID)。name が未確定 (新規追加直後) でも
+   * 選択状態を一意に保つ。サーバー送信 / JSON 保存時に必ず除去する。
+   */
+  __clientId?: string;
 }
 
 /**

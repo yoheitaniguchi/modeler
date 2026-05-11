@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { gotoDesignTab, newApiContext, resetDeployedModels } from './helpers.js';
+import { gotoAdminMode, newApiContext, resetDeployedModels } from './helpers.js';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
@@ -39,7 +39,7 @@ test.describe('画面定義 (UiConfig + ボタン定義) の保存/読込', () =
       'utf-8',
     );
 
-    await gotoDesignTab(page);
+    await gotoAdminMode(page);
 
     // JSON 読込
     const fileChooserPromise = page.waitForEvent('filechooser');

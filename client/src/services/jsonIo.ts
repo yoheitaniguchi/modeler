@@ -1,4 +1,4 @@
-import type { ModelDefinitionDocument } from '@modeler/shared';
+import type { ModelDefinition, ModelDefinitionDocument } from '@modeler/shared';
 import { validateDocument } from '@modeler/shared';
 
 /**
@@ -11,8 +11,19 @@ import { validateDocument } from '@modeler/shared';
  *     こうすると Node 環境のテストでも素直にテストできる。
  */
 
+/**
+ * ドキュメントからクライアント内部用フィールド (__clientId 等) を取り除く。
+ * サーバー送信 / JSON 保存の直前で必ず通すこと。
+ */
+export function stripClientFields(doc: ModelDefinitionDocument): ModelDefinitionDocument {
+  return {
+    ...doc,
+    models: doc.models.map(({ __clientId: _ignored, ...rest }) => rest as ModelDefinition),
+  };
+}
+
 export function serialize(doc: ModelDefinitionDocument): string {
-  return JSON.stringify(doc, null, 2);
+  return JSON.stringify(stripClientFields(doc), null, 2);
 }
 
 export function parse(text: string): ModelDefinitionDocument {

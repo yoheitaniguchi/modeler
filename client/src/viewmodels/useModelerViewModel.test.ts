@@ -29,6 +29,140 @@ describe('useModelerViewModel', () => {
     expect(doc.models[0].fields[0].required).toBe(true);
   });
 
+  it('addModel は __clientId を付与し、自動的に selectedKey に設定する', () => {
+    const { result } = renderHook(() => useModelerViewModel(createFakeApi()));
+    expect(result.current.selectedKey).toBeNull();
+
+    act(() => result.current.addModel());
+    const id1 = result.current.document.models[0].__clientId;
+    expect(id1).toBeDefined();
+    expect(result.current.selectedKey).toBe(id1);
+
+    act(() => result.current.addModel());
+    const id2 = result.current.document.models[1].__clientId;
+    expect(id2).toBeDefined();
+    expect(id2).not.toBe(id1);
+    expect(result.current.selectedKey).toBe(id2);
+  });
+
+  it('select で selectedKey を変更できる', () => {
+    const { result } = renderHook(() => useModelerViewModel(createFakeApi()));
+    act(() => result.current.addModel());
+    const id1 = result.current.document.models[0].__clientId!;
+    act(() => result.current.addModel());
+    expect(result.current.selectedKey).not.toBe(id1);
+
+    act(() => result.current.select(id1));
+    expect(result.current.selectedKey).toBe(id1);
+
+    act(() => result.current.select(null));
+    expect(result.current.selectedKey).toBeNull();
+  });
+
+  it('removeModel で選択中モデルが消えたら selectedKey が null に戻る', () => {
+    const { result } = renderHook(() => useModelerViewModel(createFakeApi()));
+    act(() => result.current.addModel());
+    act(() => result.current.addModel());
+    const id1 = result.current.document.models[0].__clientId!;
+    act(() => result.current.select(id1));
+
+    act(() => result.current.removeModel(0));
+    expect(result.current.selectedKey).toBeNull();
+  });
+
+  it('removeModel で非選択モデルを消しても selectedKey は維持', () => {
+    const { result } = renderHook(() => useModelerViewModel(createFakeApi()));
+    act(() => result.current.addModel());
+    act(() => result.current.addModel());
+    const id2 = result.current.document.models[1].__clientId!;
+    act(() => result.current.select(id2));
+
+    act(() => result.current.removeModel(0));
+    expect(result.current.selectedKey).toBe(id2);
+  });
+
+  it('replaceModel は既存の __clientId を保持する', () => {
+    const { result } = renderHook(() => useModelerViewModel(createFakeApi()));
+    act(() => result.current.addModel());
+    const id = result.current.document.models[0].__clientId!;
+
+    // 呼び出し側が __clientId を持たないモデルを渡しても保持されること
+    act(() =>
+      result.current.replaceModel(0, {
+        name: 'customer',
+        label: '顧客',
+        fields: [{ name: 'a', label: 'A', type: 'string', required: false }],
+      }),
+    );
+    expect(result.current.document.models[0].__clientId).toBe(id);
+  });
+
+  it('exportJson は __clientId をシリアライズに含めない', () => {
+    const { result } = renderHook(() => useModelerViewModel(createFakeApi()));
+    act(() => result.current.addModel());
+    act(() => result.current.updateModel(0, { name: 'customer', label: '顧客' }));
+    act(() =>
+      result.current.updateField(0, 0, {
+        name: 'a',
+        label: 'A',
+        type: 'string',
+        required: false,
+      }),
+    );
+
+    let json: string | null = null;
+    act(() => {
+      json = result.current.exportJson();
+    });
+    expect(json).not.toBeNull();
+    expect(json!).not.toMatch(/__clientId/);
+    // 復元できる形であること
+    const parsed = JSON.parse(json!);
+    expect(parsed.models[0].name).toBe('customer');
+    expect(parsed.models[0].__clientId).toBeUndefined();
+  });
+
+  it('importJson は読み込んだモデルに __clientId を付与する', () => {
+    const { result } = renderHook(() => useModelerViewModel(createFakeApi()));
+    const json = JSON.stringify({
+      version: 1,
+      models: [
+        {
+          name: 'customer',
+          label: '顧客',
+          fields: [{ name: 'a', label: 'A', type: 'string', required: false }],
+        },
+      ],
+    });
+    act(() => {
+      result.current.importJson(json);
+    });
+    expect(result.current.document.models[0].__clientId).toBeDefined();
+    expect(result.current.selectedKey).toBe(result.current.document.models[0].__clientId);
+  });
+
+  it('deploy は __clientId を含まずに API へ送る', async () => {
+    const api = createFakeApi();
+    const { result } = renderHook(() => useModelerViewModel(api));
+    act(() => result.current.addModel());
+    act(() => result.current.updateModel(0, { name: 'customer', label: '顧客' }));
+    act(() =>
+      result.current.updateField(0, 0, {
+        name: 'a',
+        label: 'A',
+        type: 'string',
+        required: false,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.deploy();
+    });
+    // FakeApi に保存されたモデルは __clientId を持たないこと
+    expect(api._models).toHaveLength(1);
+    expect((api._models[0] as { __clientId?: string }).__clientId).toBeUndefined();
+  });
+
   it('exportJson は不正なドキュメントなら null + errors', () => {
     const { result } = renderHook(() => useModelerViewModel(createFakeApi()));
     // モデル 0 件の状態だと models 自体は空配列で許容されるので、
@@ -97,6 +231,47 @@ describe('useModelerViewModel', () => {
 
     act(() => result.current.redo());
     expect(result.current.document.models).toHaveLength(1);
+  });
+
+  it('moveModel で並び順が変わり、undo で戻る', () => {
+    const { result } = renderHook(() => useModelerViewModel(createFakeApi()));
+    act(() => result.current.addModel());
+    act(() => result.current.updateModel(0, { name: 'a', label: 'A' }));
+    act(() => result.current.addModel());
+    act(() => result.current.updateModel(1, { name: 'b', label: 'B' }));
+    act(() => result.current.addModel());
+    act(() => result.current.updateModel(2, { name: 'c', label: 'C' }));
+    expect(result.current.document.models.map((m) => m.name)).toEqual(['a', 'b', 'c']);
+
+    // 0 番目 (a) を末尾へ
+    act(() => result.current.moveModel(0, 2));
+    expect(result.current.document.models.map((m) => m.name)).toEqual(['b', 'c', 'a']);
+
+    // undo で元に戻る
+    act(() => result.current.undo());
+    expect(result.current.document.models.map((m) => m.name)).toEqual(['a', 'b', 'c']);
+
+    // redo で再び並び替え後へ
+    act(() => result.current.redo());
+    expect(result.current.document.models.map((m) => m.name)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('moveModel は同一位置 / 範囲外で no-op', () => {
+    const { result } = renderHook(() => useModelerViewModel(createFakeApi()));
+    act(() => result.current.addModel());
+    act(() => result.current.updateModel(0, { name: 'a', label: 'A' }));
+    act(() => result.current.addModel());
+    act(() => result.current.updateModel(1, { name: 'b', label: 'B' }));
+    const before = result.current.document;
+
+    act(() => result.current.moveModel(0, 0));
+    expect(result.current.document).toBe(before);
+
+    act(() => result.current.moveModel(-1, 1));
+    expect(result.current.document).toBe(before);
+
+    act(() => result.current.moveModel(0, 99));
+    expect(result.current.document).toBe(before);
   });
 
   it('importJson は履歴をリセットする', () => {
