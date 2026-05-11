@@ -74,7 +74,8 @@ export class JsonFileDao {
   }
 
   async create(input: Record<string, unknown>): Promise<ModelRecord> {
-    const formatted = formatRecord(this.model, input);
+    const withIds = await this.generateIdFields(input);
+    const formatted = formatRecord(this.model, withIds);
     const validation = validateRecord(this.model, formatted);
     if (!validation.ok) {
       throw new DaoValidationError(validation.errors);
@@ -236,6 +237,8 @@ export class JsonFileDao {
 
   private checkUniqueConstraints(input: Record<string, unknown>, all: ModelRecord[], excludeId?: string): void {
     const errors: string[] = [];
+    
+    // Check standard unique constraints
     for (const field of this.model.fields) {
       if (field.validation?.unique) {
         const val = input[field.name];
@@ -250,9 +253,81 @@ export class JsonFileDao {
         }
       }
     }
+
+    // Check primary key constraints (single or composite)
+    const pkFields = this.model.fields.filter(f => f.primaryKey);
+    if (pkFields.length > 0) {
+      const missingPk = pkFields.filter(f => {
+        const val = input[f.name];
+        return val === undefined || val === null || val === '';
+      });
+      if (missingPk.length > 0) {
+        missingPk.forEach(f => errors.push(`${f.name}: is required (Primary Key)`));
+      } else {
+        const dup = all.some(r => {
+          if (excludeId !== undefined && String(r.id) === String(excludeId)) {
+            return false;
+          }
+          if (this.model.softDelete && r._deleted === true) {
+            return false;
+          }
+          return pkFields.every(field => {
+            const val1 = input[field.name];
+            const val2 = r[field.name];
+            return String(val1) === String(val2);
+          });
+        });
+
+        if (dup) {
+          if (pkFields.length === 1) {
+            errors.push(`${pkFields[0].name}: must be unique (Primary Key)`);
+          } else {
+            const names = pkFields.map(f => f.name).join(', ');
+            errors.push(`composite primary key (${names}): must be unique`);
+          }
+        }
+      }
+    }
+
     if (errors.length > 0) {
       throw new DaoValidationError(errors);
     }
+  }
+
+  private async generateIdFields(input: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const result = { ...input };
+    for (const field of this.model.fields) {
+      if (field.type === 'id') {
+        const val = result[field.name];
+        if (val === undefined || val === null || val === '') {
+          let generatedId: string | undefined = undefined;
+          if (field.numberingUrl) {
+            try {
+              const url = field.numberingUrl.startsWith('http')
+                ? field.numberingUrl
+                : `http://localhost:${process.env.PORT || 4000}${field.numberingUrl}`;
+              const res = await fetch(url);
+              if (res.ok) {
+                const contentType = res.headers.get('content-type') ?? '';
+                if (contentType.includes('application/json')) {
+                   const json = await res.json() as Record<string, unknown>;
+                   generatedId = String(json.id ?? json.number ?? json.value ?? json.code ?? Object.values(json)[0] ?? '');
+                } else {
+                  generatedId = (await res.text()).trim();
+                }
+              }
+            } catch (err) {
+              console.error(`Failed to fetch custom numbering from ${field.numberingUrl}:`, err);
+            }
+          }
+          if (!generatedId) {
+            generatedId = randomUUID();
+          }
+          result[field.name] = generatedId;
+        }
+      }
+    }
+    return result;
   }
 
   private async persist(records: ModelRecord[]): Promise<void> {

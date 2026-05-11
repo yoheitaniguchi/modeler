@@ -145,6 +145,70 @@ describe('JsonFileDao', () => {
     // duplicate update
     await expect(uniqueDao.update(second.id, { email: 'test@example.com' })).rejects.toBeInstanceOf(DaoValidationError);
   });
+
+  it('単一主キーの一意制約が機能する', async () => {
+    const pkDao = new JsonFileDao({
+      ...model,
+      name: 'pk-test',
+      fields: [
+        { name: 'code', label: 'コード', type: 'string', required: true, primaryKey: true },
+        { name: 'name', label: '名称', type: 'string', required: false },
+      ],
+    }, dataDir);
+    await pkDao.init();
+    await pkDao.create({ code: 'A01', name: 'りんご' });
+
+    // 重複した主キーでの登録は失敗する
+    await expect(pkDao.create({ code: 'A01', name: 'ばなな' })).rejects.toBeInstanceOf(DaoValidationError);
+
+    // 別の主キーであれば登録できる
+    const second = await pkDao.create({ code: 'A02', name: 'ばなな' });
+
+    // 主キーを重複させる更新は失敗する
+    await expect(pkDao.update(second.id, { code: 'A01', name: 'ばなな' })).rejects.toBeInstanceOf(DaoValidationError);
+  });
+
+  it('複合主キーの一意制約が機能する', async () => {
+    const compositeDao = new JsonFileDao({
+      ...model,
+      name: 'composite-pk-test',
+      fields: [
+        { name: 'tenant_id', label: 'テナントID', type: 'string', required: true, primaryKey: true },
+        { name: 'user_id', label: 'ユーザーID', type: 'string', required: true, primaryKey: true },
+        { name: 'role', label: '役割', type: 'string', required: false },
+      ],
+    }, dataDir);
+    await compositeDao.init();
+    await compositeDao.create({ tenant_id: 'tenant-1', user_id: 'user-1', role: 'admin' });
+
+    // 部分的に重複していても、全主キーの組み合わせが一意なら登録できる
+    await compositeDao.create({ tenant_id: 'tenant-1', user_id: 'user-2', role: 'member' });
+    await compositeDao.create({ tenant_id: 'tenant-2', user_id: 'user-1', role: 'member' });
+
+    // 完全に重複した組み合わせでの登録は失敗する
+    await expect(
+      compositeDao.create({ tenant_id: 'tenant-1', user_id: 'user-1', role: 'other' })
+    ).rejects.toBeInstanceOf(DaoValidationError);
+  });
+
+  it('id型フィールドでのUUID自動採番が機能する', async () => {
+    const idDao = new JsonFileDao({
+      ...model,
+      name: 'id-auto-test',
+      fields: [
+        { name: 'uid', label: 'UID', type: 'id', required: false, primaryKey: true },
+        { name: 'name', label: '名称', type: 'string', required: true },
+      ],
+    }, dataDir);
+    await idDao.init();
+
+    // uidを空にして登録
+    const created = await idDao.create({ name: '山田太郎' });
+    const uid = created['uid'] as string;
+    expect(uid).toBeTypeOf('string');
+    expect(uid.length).toBeGreaterThan(10); // UUIDの妥当な長さ
+    expect(created['name']).toBe('山田太郎');
+  });
 });
 
 /**

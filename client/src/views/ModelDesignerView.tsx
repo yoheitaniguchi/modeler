@@ -50,10 +50,31 @@ export function ModelDesignerView({
           />
         </div>
       ) : (
-        <p className="muted" data-testid="no-model-selected">
-          左のリストからモデルを選択してください。
-          {models.length === 0 && '（まだモデルがありません。「+ モデル追加」から開始）'}
-        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="row" style={{ justifyContent: 'flex-end', gap: '0.4rem', marginBottom: '0.5rem' }}>
+            <button
+              type="button"
+              className="ghost"
+              onClick={onLoadJson}
+              data-testid="load-json"
+              title="JSON 読込 (Ctrl+O)"
+              style={{
+                padding: '0.4rem 0.8rem',
+                fontSize: '0.85rem',
+                borderRadius: '4px',
+                border: '1px solid #d1d5db',
+                backgroundColor: 'white',
+                cursor: 'pointer'
+              }}
+            >
+              JSON 読込
+            </button>
+          </div>
+          <p className="muted" data-testid="no-model-selected" style={{ marginTop: 0 }}>
+            左のリストからモデルを選択してください。
+            {models.length === 0 && '（まだモデルがありません。「+ モデル追加」から開始）'}
+          </p>
+        </div>
       )}
     </section>
   );

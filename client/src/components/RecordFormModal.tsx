@@ -88,18 +88,22 @@ export function RecordFormModal({
         )}
 
         <div className="form-grid">
-          {model.fields.map((f) => (
-            <div key={f.name} className="field-group">
-              <label style={{ color: f.required ? '#dc2626' : '#555' }}>
-                {f.label}
-              </label>
-              <FieldInput
-                field={f}
-                value={form[f.name]}
-                onChange={(v) => setForm((prev) => ({ ...prev, [f.name]: v }))}
-              />
-            </div>
-          ))}
+          {model.fields.filter((f) => f.showInDetail !== false).map((f) => {
+            const isRequired = f.required || f.primaryKey === true;
+            return (
+              <div key={f.name} className="field-group">
+                <label style={{ color: isRequired ? '#dc2626' : '#555' }}>
+                  {f.label}
+                  {isRequired && <span style={{ color: '#dc2626', marginLeft: '0.2rem' }}>*</span>}
+                </label>
+                <FieldInput
+                  field={f}
+                  value={form[f.name]}
+                  onChange={(v) => setForm((prev) => ({ ...prev, [f.name]: v }))}
+                />
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

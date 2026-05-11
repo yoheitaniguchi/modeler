@@ -112,10 +112,15 @@ export function BulkImportModal({
     const blob = new Blob([log], { type: 'text/tab-separated-values;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
+    a.style.display = 'none';
     a.href = url;
     a.download = `${model.name}_import_errors.tsv`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 150);
   };
 
   const hasErrors = validation !== null && validation.rowErrors.length > 0;
@@ -135,7 +140,7 @@ export function BulkImportModal({
       <div className="modal bulk-import-modal">
         {/* ヘッダ */}
         <div className="bulk-import-header">
-          <h3 style={{ margin: 0 }}>一括登録 — {model.label}</h3>
+          <h3 style={{ margin: 0 }}>インポート — {model.label}</h3>
           <button
             className="ghost bulk-import-close"
             onClick={handleClose}
