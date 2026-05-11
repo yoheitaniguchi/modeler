@@ -13,12 +13,14 @@ export function InlineModelEditor({
   onCancel,
   saving,
   errors,
+  knownModelNames,
 }: {
   initial: ModelDefinition;
   onSave: (next: ModelDefinition) => void;
   onCancel: () => void;
   saving: boolean;
   errors: string[];
+  knownModelNames?: string[];
 }) {
   const [draft, setDraft] = useState<ModelDefinition>(() => structuredClone(initial));
 
@@ -46,6 +48,7 @@ export function InlineModelEditor({
         onChange={setDraft}
         showRemoveModel={false}
         disableNameEdit
+        knownModelNames={knownModelNames}
       />
     </div>
   );

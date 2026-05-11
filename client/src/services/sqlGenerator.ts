@@ -1,4 +1,10 @@
-import type { FieldDefinition, FieldType, ModelDefinition } from '@modeler/shared';
+import type {
+  FieldDefinition,
+  FieldType,
+  ModelDefinition,
+  ReferentialAction,
+} from '@modeler/shared';
+import { DEFAULT_ON_DELETE, DEFAULT_ON_UPDATE } from '@modeler/shared';
 
 /**
  * モデル定義から各 DBMS 向けの CREATE TABLE 文を生成する純粋関数群。
@@ -72,13 +78,63 @@ function buildColumnDdl(field: FieldDefinition, dialect: SqlDialect): string {
   return parts.join(' ');
 }
 
+const REFERENTIAL_ACTION_SQL: Record<ReferentialAction, string> = {
+  restrict: 'RESTRICT',
+  cascade: 'CASCADE',
+  setNull: 'SET NULL',
+  noAction: 'NO ACTION',
+};
+
+function buildForeignKeyDdl(
+  model: ModelDefinition,
+  field: FieldDefinition,
+  dialect: SqlDialect,
+): { ddl: string; comment?: string } | null {
+  if (field.type !== 'reference') return null;
+  if (!field.targetModel) return null;
+  const constraintName = `fk_${model.name}_${field.name}`;
+  const constraintIdent = quoteIdentifier(constraintName, dialect);
+  const colIdent = quoteIdentifier(field.name, dialect);
+  const refTableIdent = quoteIdentifier(field.targetModel, dialect);
+  const refColIdent = quoteIdentifier('id', dialect);
+  const base = `CONSTRAINT ${constraintIdent} FOREIGN KEY (${colIdent}) REFERENCES ${refTableIdent}(${refColIdent})`;
+  if (dialect === 'msaccess') {
+    // MS Access (Jet SQL) は CREATE TABLE 内で ON DELETE / ON UPDATE をサポートしない。
+    return {
+      ddl: base,
+      comment: '-- ON DELETE/UPDATE not supported in MS Access DDL',
+    };
+  }
+  const onDelete = REFERENTIAL_ACTION_SQL[field.onDelete ?? DEFAULT_ON_DELETE];
+  const onUpdate = REFERENTIAL_ACTION_SQL[field.onUpdate ?? DEFAULT_ON_UPDATE];
+  return { ddl: `${base} ON DELETE ${onDelete} ON UPDATE ${onUpdate}` };
+}
+
 export function generateCreateTable(model: ModelDefinition, dialect: SqlDialect): string {
   if (model.fields.length === 0) {
     throw new Error('フィールドが0件のためSQLを生成できません');
   }
   const tableIdent = quoteIdentifier(model.name, dialect);
-  const columns = model.fields.map((f) => `  ${buildColumnDdl(f, dialect)}`);
-  return `CREATE TABLE ${tableIdent} (\n${columns.join(',\n')}\n);\n`;
+  const columnLines = model.fields.map((f) => `  ${buildColumnDdl(f, dialect)}`);
+  const fkLines: string[] = [];
+  for (const f of model.fields) {
+    const fk = buildForeignKeyDdl(model, f, dialect);
+    if (!fk) continue;
+    if (fk.comment) fkLines.push(`  ${fk.comment}`);
+    fkLines.push(`  ${fk.ddl}`);
+  }
+  const bodyLines = [...columnLines, ...fkLines];
+  // コメント行はカンマを付けない。各行末カンマ判定: 最終の DDL 行のみカンマなし、その他は付与。
+  const joined = bodyLines
+    .map((line, idx) => {
+      const isComment = line.trimStart().startsWith('--');
+      if (isComment) return line;
+      // 次の非コメント行が存在するかチェック
+      const hasMoreDdl = bodyLines.slice(idx + 1).some((l) => !l.trimStart().startsWith('--'));
+      return hasMoreDdl ? `${line},` : line;
+    })
+    .join('\n');
+  return `CREATE TABLE ${tableIdent} (\n${joined}\n);\n`;
 }
 
 function pad2(n: number): string {

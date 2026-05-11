@@ -2,6 +2,8 @@ import express, { type Express, type Router } from 'express';
 import type { ModelDefinition, ModelDefinitionDocument } from '@modeler/shared';
 import { validateDocument } from '@modeler/shared';
 import { createCrudRouter } from '../routes/crudRouter.js';
+import type { JsonFileDao } from '../dao/jsonFileDao.js';
+import { DaoRegistryImpl } from '../dao/daoRegistry.js';
 
 /**
  * デプロイ済みモデルのレジストリ。
@@ -23,6 +25,8 @@ export class DeployRegistry {
   private deployed: ModelDefinition[] = [];
   /** 各モデル名に対する Router を保持。DAO の再初期化を避けるため。 */
   private routerMap = new Map<string, Router>();
+  /** 各モデル名に対する DAO を保持。FK 整合性チェック (Task 6) で他モデル DAO を引くのに使う。 */
+  private daoMap = new Map<string, JsonFileDao>();
 
   /** Express にマウントする入口。一度マウントすれば以後の差し替えは自動反映。 */
   attach(app: Express, basePath: string): void {
@@ -32,6 +36,22 @@ export class DeployRegistry {
   list(): ModelDefinition[] {
     // 防御的コピー — 呼び出し側が誤って中身を書き換えないように。
     return this.deployed.map((m) => ({ ...m, fields: [...m.fields] }));
+  }
+
+  /** デバッグ/テスト用。指定モデル名の DAO を取得する。 */
+  getDao(modelName: string): JsonFileDao | undefined {
+    return this.daoMap.get(modelName);
+  }
+
+  /**
+   * daoMap と deployed から DaoRegistry を構築し、全 DAO に注入する。
+   * deploy / updateModel / removeModel の最後で必ず呼び、registry を最新化する。
+   */
+  private rewireRegistry(): void {
+    const registry = new DaoRegistryImpl(new Map(this.daoMap), [...this.deployed]);
+    for (const dao of this.daoMap.values()) {
+      dao.setRegistry(registry);
+    }
   }
 
   /**
@@ -49,14 +69,16 @@ export class DeployRegistry {
     // 新しい Router を作成し、各モデルのルートを登録
     const next = express.Router();
     const newRouterMap = new Map<string, Router>();
+    const newDaoMap = new Map<string, JsonFileDao>();
 
     // 各 DAO の init() を待ってからスイッチすることで、
     // 半端な状態でリクエストが届くのを避ける。
     await Promise.all(
       doc.models.map(async (model) => {
-        const { router, ready } = createCrudRouter(model, dataDir);
+        const { router, ready, dao } = createCrudRouter(model, dataDir);
         await ready;
         newRouterMap.set(model.name, router);
+        newDaoMap.set(model.name, dao);
         next.use(`/${model.name}`, router);
       }),
     );
@@ -64,6 +86,8 @@ export class DeployRegistry {
     this.current = next;
     this.deployed = doc.models;
     this.routerMap = newRouterMap;
+    this.daoMap = newDaoMap;
+    this.rewireRegistry();
     return { deployed: this.list() };
   }
 
@@ -82,18 +106,22 @@ export class DeployRegistry {
     const idx = this.deployed.findIndex((m) => m.name === name);
     if (idx === -1) return null;
 
-    const validation = validateDocument({ version: 1, models: [updated] });
-    if (!validation.ok) {
-      throw new DeployError(validation.errors);
-    }
     if (updated.name !== name) {
       throw new DeployError(['model.name does not match path']);
     }
+    // クロスモデル整合性 (targetModel の実在チェック等) が他モデルにも依存するため、
+    // updated を deployed に差し込んだ後のドキュメント全体で validate する。
+    const nextModels = this.deployed.map((m, i) => (i === idx ? updated : m));
+    const validation = validateDocument({ version: 1, models: nextModels });
+    if (!validation.ok) {
+      throw new DeployError(validation.errors);
+    }
 
-    const { router, ready } = createCrudRouter(updated, dataDir);
+    const { router, ready, dao } = createCrudRouter(updated, dataDir);
     await ready;
 
     this.routerMap.set(name, router);
+    this.daoMap.set(name, dao);
     this.deployed = this.deployed.map((m, i) => (i === idx ? updated : m));
 
     // current を再構築 (順序維持)
@@ -103,6 +131,7 @@ export class DeployRegistry {
       if (r) next.use(`/${model.name}`, r);
     }
     this.current = next;
+    this.rewireRegistry();
     return updated;
   }
 
@@ -117,6 +146,7 @@ export class DeployRegistry {
 
     this.deployed = this.deployed.filter((_, i) => i !== idx);
     this.routerMap.delete(name);
+    this.daoMap.delete(name);
 
     // 残りモデルの Router から新しい current を構築
     const next = express.Router();
@@ -127,6 +157,7 @@ export class DeployRegistry {
       }
     }
     this.current = next;
+    this.rewireRegistry();
     return true;
   }
 }

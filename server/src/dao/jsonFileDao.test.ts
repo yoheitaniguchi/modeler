@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { ModelDefinition } from '@modeler/shared';
 import { DaoValidationError, JsonFileDao } from './jsonFileDao.js';
+import { DaoRegistryImpl } from './daoRegistry.js';
 
 /**
  * DAO のテスト方針:
@@ -109,6 +110,23 @@ describe('JsonFileDao', () => {
     expect(created.code).toBe('ABC');
   });
 
+  it('registry 未注入なら整合性チェックは no-op (後方互換)', async () => {
+    // この dao は setRegistry を呼んでいないため、reference フィールドがあっても
+    // checkOutgoingFkExist は何もしない。
+    const refModel: ModelDefinition = {
+      name: 'order',
+      label: '注文',
+      fields: [
+        { name: 'customer', label: '顧客', type: 'reference', required: false, targetModel: 'customer' },
+      ],
+    };
+    const refDao = new JsonFileDao(refModel, dataDir);
+    await refDao.init();
+    // どんな ID を渡しても通る (registry 未注入のため)
+    const created = await refDao.create({ customer: 'nonexistent-id' });
+    expect(created.customer).toBe('nonexistent-id');
+  });
+
   it('ユニーク制約が機能する', async () => {
     const uniqueDao = new JsonFileDao({
       ...model,
@@ -119,12 +137,144 @@ describe('JsonFileDao', () => {
     }, dataDir);
     await uniqueDao.init();
     await uniqueDao.create({ email: 'test@example.com' });
-    
+
     // duplicate create
     await expect(uniqueDao.create({ email: 'test@example.com' })).rejects.toBeInstanceOf(DaoValidationError);
-    
+
     const second = await uniqueDao.create({ email: 'other@example.com' });
     // duplicate update
     await expect(uniqueDao.update(second.id, { email: 'test@example.com' })).rejects.toBeInstanceOf(DaoValidationError);
+  });
+});
+
+/**
+ * FK 整合性チェック (Task 6) の単体テスト。
+ * DaoRegistry を手動で組み立てて DAO 同士を繋ぎ、create/update/remove の挙動を検証する。
+ */
+describe('JsonFileDao — FK 整合性', () => {
+  let dataDir: string;
+
+  const departmentModel: ModelDefinition = {
+    name: 'department',
+    label: '部署',
+    fields: [{ name: 'name', label: '名称', type: 'string', required: true }],
+  };
+
+  function buildSetup(employeeOnDelete?: 'restrict' | 'cascade' | 'setNull' | 'noAction', employeeRequired = false) {
+    const employeeModel: ModelDefinition = {
+      name: 'employee',
+      label: '従業員',
+      fields: [
+        { name: 'name', label: '氏名', type: 'string', required: true },
+        {
+          name: 'dept',
+          label: '部署',
+          type: 'reference',
+          required: employeeRequired,
+          targetModel: 'department',
+          ...(employeeOnDelete ? { onDelete: employeeOnDelete } : {}),
+        },
+      ],
+    };
+    const deptDao = new JsonFileDao(departmentModel, dataDir);
+    const empDao = new JsonFileDao(employeeModel, dataDir);
+    const daoMap = new Map<string, JsonFileDao>([
+      ['department', deptDao],
+      ['employee', empDao],
+    ]);
+    const registry = new DaoRegistryImpl(daoMap, [departmentModel, employeeModel]);
+    deptDao.setRegistry(registry);
+    empDao.setRegistry(registry);
+    return { deptDao, empDao };
+  }
+
+  beforeEach(async () => {
+    dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'modeler-dao-fk-'));
+  });
+
+  afterEach(async () => {
+    await fs.rm(dataDir, { recursive: true, force: true });
+  });
+
+  it('存在しない FK ID で create → DaoValidationError', async () => {
+    const { deptDao, empDao } = buildSetup();
+    await deptDao.init();
+    await empDao.init();
+    await expect(empDao.create({ name: 'Alice', dept: 'nonexistent' })).rejects.toBeInstanceOf(
+      DaoValidationError,
+    );
+  });
+
+  it('存在する FK ID で create → 成功', async () => {
+    const { deptDao, empDao } = buildSetup();
+    await deptDao.init();
+    await empDao.init();
+    const dept = await deptDao.create({ name: 'sales' });
+    const emp = await empDao.create({ name: 'Alice', dept: dept.id });
+    expect(emp.dept).toBe(dept.id);
+  });
+
+  it('update で存在しない FK ID → DaoValidationError', async () => {
+    const { deptDao, empDao } = buildSetup();
+    await deptDao.init();
+    await empDao.init();
+    const dept = await deptDao.create({ name: 'sales' });
+    const emp = await empDao.create({ name: 'Alice', dept: dept.id });
+    await expect(empDao.update(emp.id, { name: 'Alice', dept: 'missing' })).rejects.toBeInstanceOf(
+      DaoValidationError,
+    );
+  });
+
+  it('onDelete=restrict — 被参照があれば削除を阻止', async () => {
+    const { deptDao, empDao } = buildSetup('restrict');
+    await deptDao.init();
+    await empDao.init();
+    const dept = await deptDao.create({ name: 'sales' });
+    await empDao.create({ name: 'Alice', dept: dept.id });
+    await expect(deptDao.remove(dept.id)).rejects.toBeInstanceOf(DaoValidationError);
+    // Department は残ったまま
+    expect(await deptDao.get(dept.id)).not.toBeNull();
+  });
+
+  it('onDelete=noAction — restrict と同様に阻止', async () => {
+    const { deptDao, empDao } = buildSetup('noAction');
+    await deptDao.init();
+    await empDao.init();
+    const dept = await deptDao.create({ name: 'sales' });
+    await empDao.create({ name: 'Alice', dept: dept.id });
+    await expect(deptDao.remove(dept.id)).rejects.toBeInstanceOf(DaoValidationError);
+  });
+
+  it('onDelete=cascade — 被参照レコードも連鎖削除', async () => {
+    const { deptDao, empDao } = buildSetup('cascade');
+    await deptDao.init();
+    await empDao.init();
+    const dept = await deptDao.create({ name: 'sales' });
+    const emp = await empDao.create({ name: 'Alice', dept: dept.id });
+    expect(await deptDao.remove(dept.id)).toBe(true);
+    expect(await deptDao.get(dept.id)).toBeNull();
+    expect(await empDao.get(emp.id)).toBeNull();
+  });
+
+  it('onDelete=setNull — 被参照レコードのフィールドが null になる', async () => {
+    const { deptDao, empDao } = buildSetup('setNull');
+    await deptDao.init();
+    await empDao.init();
+    const dept = await deptDao.create({ name: 'sales' });
+    const emp = await empDao.create({ name: 'Alice', dept: dept.id });
+    expect(await deptDao.remove(dept.id)).toBe(true);
+    expect(await deptDao.get(dept.id)).toBeNull();
+    const updated = await empDao.get(emp.id);
+    expect(updated).not.toBeNull();
+    expect(updated?.dept).toBeNull();
+  });
+
+  it('被参照がなければ restrict でも削除できる', async () => {
+    const { deptDao, empDao } = buildSetup('restrict');
+    await deptDao.init();
+    await empDao.init();
+    const dept = await deptDao.create({ name: 'sales' });
+    expect(await deptDao.remove(dept.id)).toBe(true);
+    expect(await empDao.list()).toHaveLength(0);
   });
 });

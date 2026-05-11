@@ -4,8 +4,10 @@ import type {
   FieldType,
   ModelDefinition,
   ModelUiConfig,
+  RelationKind,
+  ReferentialAction,
 } from '@modeler/shared';
-import { isValidIdentifier } from '@modeler/shared';
+import { isValidIdentifier, RELATION_KINDS, REFERENTIAL_ACTIONS } from '@modeler/shared';
 import { UiConfigEditor } from './UiConfigEditor.js';
 import { ButtonsEditor } from './ButtonsEditor.js';
 import { HelpTip } from './HelpTip.js';
@@ -28,12 +30,25 @@ const TYPE_HINT = 'string / number / boolean / date のいずれか。型を変�
 const OPTIONS_URL_HINT =
   'string 型のセレクトボックス用。指定 URL の GET レスポンス (string[] または {id,label}[]) を選択肢に使います。';
 
+const RELATION_KIND_LABEL: Record<RelationKind, string> = {
+  oneToOne: '1 : 1',
+  oneToMany: '1 : N',
+  manyToMany: 'N : N (未実装)',
+};
+const REFERENTIAL_ACTION_LABEL: Record<ReferentialAction, string> = {
+  restrict: 'RESTRICT (参照があれば削除不可)',
+  cascade: 'CASCADE (連鎖削除)',
+  setNull: 'SET NULL (null 化)',
+  noAction: 'NO ACTION (何もしない)',
+};
+
 export function ModelEditor({
   model,
   onChange,
   onRemoveModel,
   showRemoveModel = true,
   disableNameEdit = false,
+  knownModelNames,
 }: {
   model: ModelDefinition;
   onChange: (next: ModelDefinition) => void;
@@ -41,6 +56,8 @@ export function ModelEditor({
   showRemoveModel?: boolean;
   /** インライン編集時は name を変えないように true にする。 */
   disableNameEdit?: boolean;
+  /** 参照先候補のモデル名一覧。指定すると targetModel が select になり、未知名の警告も出る。 */
+  knownModelNames?: string[];
 }) {
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const updateModel = (patch: Partial<ModelDefinition>) => {
@@ -295,18 +312,40 @@ export function ModelEditor({
                   <td colSpan={7} style={{ backgroundColor: '#f9f9f9', padding: '0.8rem', borderBottom: '1px solid #ddd' }}>
                     <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
                       {field.type === 'reference' && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: '200px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: '280px' }}>
                           <strong>リレーション設定</strong>
                           <label style={{ fontSize: '0.85rem' }}>
                             参照先モデル名 (targetModel)
-                            <input
-                              type="text"
-                              value={field.targetModel ?? ''}
-                              placeholder="e.g. department"
-                              onChange={(e) => updateField(fi, { targetModel: e.target.value })}
-                              style={{ width: '100%', marginTop: '0.2rem' }}
-                            />
+                            {knownModelNames ? (
+                              <select
+                                value={field.targetModel ?? ''}
+                                onChange={(e) => updateField(fi, { targetModel: e.target.value || undefined })}
+                                style={{ width: '100%', marginTop: '0.2rem' }}
+                                data-testid={`field-target-model-${fi}`}
+                              >
+                                <option value="">(未選択)</option>
+                                {knownModelNames.map((n) => (
+                                  <option key={n} value={n}>{n}</option>
+                                ))}
+                                {field.targetModel && !knownModelNames.includes(field.targetModel) && (
+                                  <option value={field.targetModel}>{field.targetModel} (未存在)</option>
+                                )}
+                              </select>
+                            ) : (
+                              <input
+                                type="text"
+                                value={field.targetModel ?? ''}
+                                placeholder="e.g. department"
+                                onChange={(e) => updateField(fi, { targetModel: e.target.value })}
+                                style={{ width: '100%', marginTop: '0.2rem' }}
+                              />
+                            )}
                           </label>
+                          {knownModelNames && field.targetModel && !knownModelNames.includes(field.targetModel) && (
+                            <div className="inline-error" data-testid={`field-target-model-error-${fi}`}>
+                              参照先モデル "{field.targetModel}" は存在しません
+                            </div>
+                          )}
                           <label style={{ fontSize: '0.85rem' }}>
                             表示ラベルフィールド (targetLabelField)
                             <input
@@ -317,6 +356,52 @@ export function ModelEditor({
                               style={{ width: '100%', marginTop: '0.2rem' }}
                             />
                           </label>
+                          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                            <label style={{ fontSize: '0.85rem', flex: 1, minWidth: '120px' }}>
+                              カーディナリティ
+                              <select
+                                value={field.relationKind ?? ''}
+                                onChange={(e) => updateField(fi, { relationKind: (e.target.value as RelationKind) || undefined })}
+                                style={{ width: '100%', marginTop: '0.2rem' }}
+                                data-testid={`field-relation-kind-${fi}`}
+                              >
+                                <option value="">(既定: 1 : N)</option>
+                                {RELATION_KINDS.map((k) => (
+                                  <option key={k} value={k} disabled={k === 'manyToMany'}>
+                                    {RELATION_KIND_LABEL[k]}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label style={{ fontSize: '0.85rem', flex: 1, minWidth: '120px' }}>
+                              削除時の挙動 (onDelete)
+                              <select
+                                value={field.onDelete ?? ''}
+                                onChange={(e) => updateField(fi, { onDelete: (e.target.value as ReferentialAction) || undefined })}
+                                style={{ width: '100%', marginTop: '0.2rem' }}
+                                data-testid={`field-on-delete-${fi}`}
+                              >
+                                <option value="">(既定: RESTRICT)</option>
+                                {REFERENTIAL_ACTIONS.map((a) => (
+                                  <option key={a} value={a}>{REFERENTIAL_ACTION_LABEL[a]}</option>
+                                ))}
+                              </select>
+                            </label>
+                            <label style={{ fontSize: '0.85rem', flex: 1, minWidth: '120px' }}>
+                              更新時の挙動 (onUpdate)
+                              <select
+                                value={field.onUpdate ?? ''}
+                                onChange={(e) => updateField(fi, { onUpdate: (e.target.value as ReferentialAction) || undefined })}
+                                style={{ width: '100%', marginTop: '0.2rem' }}
+                                data-testid={`field-on-update-${fi}`}
+                              >
+                                <option value="">(既定: NO ACTION)</option>
+                                {REFERENTIAL_ACTIONS.map((a) => (
+                                  <option key={a} value={a}>{REFERENTIAL_ACTION_LABEL[a]}</option>
+                                ))}
+                              </select>
+                            </label>
+                          </div>
                         </div>
                       )}
                       

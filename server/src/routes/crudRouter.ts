@@ -36,6 +36,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 export function createCrudRouter(model: ModelDefinition, dataDir: string): {
   router: Router;
   ready: Promise<void>;
+  dao: JsonFileDao;
 } {
   const dao = new JsonFileDao(model, dataDir);
   const ready = dao.init();
@@ -187,13 +188,23 @@ export function createCrudRouter(model: ModelDefinition, dataDir: string): {
 
   // ── 削除 ─────────────────────────────────────────────────────────
   router.delete('/:id', async (req, res) => {
-    const removed = await dao.remove(req.params.id);
-    if (!removed) {
-      res.status(404).json({ error: 'not found' });
-      return;
+    try {
+      const removed = await dao.remove(req.params.id);
+      if (!removed) {
+        res.status(404).json({ error: 'not found' });
+        return;
+      }
+      res.status(204).end();
+    } catch (e) {
+      // restrict / noAction で被参照があり削除を阻止された場合などは
+      // DaoValidationError として上がってくる。400 で返す。
+      if (e instanceof DaoValidationError) {
+        res.status(400).json({ errors: e.errors });
+        return;
+      }
+      throw e;
     }
-    res.status(204).end();
   });
 
-  return { router, ready };
+  return { router, ready, dao };
 }

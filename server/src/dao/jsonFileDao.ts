@@ -1,8 +1,9 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { ModelDefinition, Record as ModelRecord } from '@modeler/shared';
-import { validateRecord, formatRecord } from '@modeler/shared';
+import type { ModelDefinition, Record as ModelRecord, ReferentialAction } from '@modeler/shared';
+import { validateRecord, formatRecord, DEFAULT_ON_DELETE } from '@modeler/shared';
+import type { DaoRegistry } from './daoRegistry.js';
 
 /**
  * DAO (Data Access Object) — データの読み書きをカプセル化する層。
@@ -24,12 +25,24 @@ export class JsonFileDao {
   private readonly filePath: string;
   /** 直列化用のチェーン。new Promise を待ち合わせていくシンプルなロック。 */
   private writeChain: Promise<unknown> = Promise.resolve();
+  /** クロスモデル FK チェック用に後注入されるレジストリ。未注入なら整合性チェックは no-op。 */
+  private registry?: DaoRegistry;
 
   constructor(
     private readonly model: ModelDefinition,
     dataDir: string,
   ) {
     this.filePath = path.join(dataDir, `${model.name}.json`);
+  }
+
+  /** デプロイ完了後に DeployRegistry が呼び出す。整合性チェックを有効化する。 */
+  setRegistry(registry: DaoRegistry): void {
+    this.registry = registry;
+  }
+
+  /** 自モデルの ModelDefinition を返す。整合性チェック側でフィールドを走査するため公開する。 */
+  getModel(): ModelDefinition {
+    return this.model;
   }
 
   /** ストレージ初期化。ファイルがなければ空配列で作る。 */
@@ -66,6 +79,7 @@ export class JsonFileDao {
     if (!validation.ok) {
       throw new DaoValidationError(validation.errors);
     }
+    await this.checkOutgoingFkExist(formatted);
     return this.serialize(async () => {
       const all = await this.readAll();
       this.checkUniqueConstraints(formatted, all);
@@ -82,6 +96,7 @@ export class JsonFileDao {
     if (!validation.ok) {
       throw new DaoValidationError(validation.errors);
     }
+    await this.checkOutgoingFkExist(formatted);
     return this.serialize(async () => {
       const all = await this.readAll();
       const idx = all.findIndex((r) => r.id === id);
@@ -96,7 +111,17 @@ export class JsonFileDao {
     });
   }
 
-  async remove(id: string): Promise<boolean> {
+  async remove(id: string, visited: Set<string> = new Set()): Promise<boolean> {
+    const visitKey = `${this.model.name}:${id}`;
+    if (visited.has(visitKey)) return true; // 循環: 既に処理対象 → 二重削除を防止
+    visited.add(visitKey);
+
+    // 削除前に被参照を解決する (restrict 系で 1 件でもあれば throw / cascade で連鎖 / setNull で null 化)。
+    // 自モデルの serialize ロック内に入る前に解決する。serialize の中で他 DAO の
+    // serialize を待つとロック競合が発生する可能性があるため、外で解決してから
+    // 自モデルの delete に進む。
+    await this.resolveIncomingReferences(id, visited);
+
     return this.serialize(async () => {
       const all = await this.readAll();
       const idx = all.findIndex((r) => r.id === id);
@@ -114,6 +139,99 @@ export class JsonFileDao {
         return true;
       }
     });
+  }
+
+  /**
+   * create/update 時に自モデルの reference 値が targetModel に実在するかチェック。
+   * registry 未注入 (= 単独使用) なら no-op。
+   */
+  private async checkOutgoingFkExist(input: Record<string, unknown>): Promise<void> {
+    if (!this.registry) return;
+    const errors: string[] = [];
+    for (const field of this.model.fields) {
+      if (field.type !== 'reference') continue;
+      if (!field.targetModel) continue;
+      const val = input[field.name];
+      if (val === undefined || val === null || val === '') continue;
+      const targetDao = this.registry.get(field.targetModel);
+      if (!targetDao) {
+        errors.push(`${field.name}: target model "${field.targetModel}" is not deployed`);
+        continue;
+      }
+      const exists = await targetDao.get(String(val));
+      if (!exists) {
+        errors.push(
+          `${field.name}: referenced ${field.targetModel} id "${String(val)}" does not exist`,
+        );
+      }
+    }
+    if (errors.length > 0) throw new DaoValidationError(errors);
+  }
+
+  /**
+   * remove 時の被参照解決。registry を辿って自モデルへの reference を持つ
+   * 他モデルを集め、onDelete に応じて処理する。
+   * - restrict / noAction: 1 件でもあれば DaoValidationError を throw
+   * - cascade: 各被参照レコードを再帰的に remove
+   * - setNull: 各被参照レコードのフィールドを null に更新
+   */
+  private async resolveIncomingReferences(id: string, visited: Set<string>): Promise<void> {
+    if (!this.registry) return;
+
+    type Incoming = {
+      otherModel: ModelDefinition;
+      otherDao: JsonFileDao;
+      field: { name: string; onDelete: ReferentialAction };
+    };
+    const incomings: Incoming[] = [];
+    for (const other of this.registry.models()) {
+      const otherDao = this.registry.get(other.name);
+      if (!otherDao) continue;
+      for (const f of other.fields) {
+        if (f.type !== 'reference') continue;
+        if (f.targetModel !== this.model.name) continue;
+        incomings.push({
+          otherModel: other,
+          otherDao,
+          field: { name: f.name, onDelete: f.onDelete ?? DEFAULT_ON_DELETE },
+        });
+      }
+    }
+
+    // まず restrict / noAction を先にチェック (cascade/setNull の副作用を起こす前に阻止)
+    const blockErrors: string[] = [];
+    for (const inc of incomings) {
+      if (inc.field.onDelete !== 'restrict' && inc.field.onDelete !== 'noAction') continue;
+      const all = await inc.otherDao.list();
+      const blockers = all.filter((r) => r[inc.field.name] === id);
+      if (blockers.length > 0) {
+        blockErrors.push(
+          `cannot delete: ${inc.otherModel.name}.${inc.field.name} still references this id (${blockers.length} record${blockers.length === 1 ? '' : 's'})`,
+        );
+      }
+    }
+    if (blockErrors.length > 0) throw new DaoValidationError(blockErrors);
+
+    // cascade / setNull を適用
+    for (const inc of incomings) {
+      if (inc.field.onDelete === 'cascade') {
+        const all = await inc.otherDao.list();
+        const targets = all.filter((r) => r[inc.field.name] === id);
+        for (const t of targets) {
+          await inc.otherDao.remove(t.id, visited);
+        }
+      } else if (inc.field.onDelete === 'setNull') {
+        const all = await inc.otherDao.list();
+        const targets = all.filter((r) => r[inc.field.name] === id);
+        for (const t of targets) {
+          // _deleted / id は update 側で保持されるので除外したペイロードを渡す
+          const { id: _id, _deleted, ...rest } = t;
+          void _id;
+          void _deleted;
+          await inc.otherDao.update(t.id, { ...rest, [inc.field.name]: null });
+        }
+      }
+    }
   }
 
   private checkUniqueConstraints(input: Record<string, unknown>, all: ModelRecord[], excludeId?: string): void {

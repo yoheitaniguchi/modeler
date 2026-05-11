@@ -357,3 +357,204 @@ describe('formatRecord', () => {
     expect(result.none).toBe(' ＡＢＣ ');
   });
 });
+
+/**
+ * リレーション関連の新規プロパティ (relationKind / onDelete / onUpdate) の検証。
+ * 既存 reference フィールド (新プロパティ未指定) が無改変で通ることが最重要。
+ */
+describe('relation field properties', () => {
+  const refField = (extras: object) => ({
+    name: 'dept',
+    label: '部署',
+    type: 'reference' as const,
+    required: false,
+    targetModel: 'department',
+    ...extras,
+  });
+  const makeDoc = (field: object): ModelDefinitionDocument => ({
+    version: 1,
+    models: [
+      {
+        name: 'employee',
+        label: '従業員',
+        fields: [field as never],
+      },
+      {
+        name: 'department',
+        label: '部署',
+        fields: [{ name: 'name', label: '名前', type: 'string', required: true }],
+      },
+    ],
+  });
+
+  it('既存 reference (新プロパティ未指定) は通る', () => {
+    expect(validateDocument(makeDoc(refField({}))).ok).toBe(true);
+  });
+
+  it('relationKind=oneToMany は通る', () => {
+    expect(validateDocument(makeDoc(refField({ relationKind: 'oneToMany' }))).ok).toBe(true);
+  });
+
+  it('relationKind=manyToMany は未対応として弾く', () => {
+    const result = validateDocument(makeDoc(refField({ relationKind: 'manyToMany' })));
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.some((e) => e.includes('manyToMany'))).toBe(true);
+    }
+  });
+
+  it('relationKind を reference 以外の型に指定すると弾く', () => {
+    const result = validateDocument({
+      version: 1,
+      models: [
+        {
+          name: 'm',
+          label: 'M',
+          fields: [
+            { name: 'f', label: 'F', type: 'string', required: false, relationKind: 'oneToMany' } as never,
+          ],
+        },
+      ],
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it('onDelete=cascade は通る', () => {
+    expect(validateDocument(makeDoc(refField({ onDelete: 'cascade' }))).ok).toBe(true);
+  });
+
+  it('onDelete の未知の値は弾く', () => {
+    const result = validateDocument(makeDoc(refField({ onDelete: 'BOOM' })));
+    expect(result.ok).toBe(false);
+  });
+
+  it('required=true かつ onDelete=setNull は弾く', () => {
+    const result = validateDocument(makeDoc(refField({ required: true, onDelete: 'setNull' })));
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.some((e) => e.includes('setNull'))).toBe(true);
+    }
+  });
+
+  it('onUpdate=noAction は通る', () => {
+    expect(validateDocument(makeDoc(refField({ onUpdate: 'noAction' }))).ok).toBe(true);
+  });
+
+  it('onUpdate を reference 以外に指定すると弾く', () => {
+    const result = validateDocument({
+      version: 1,
+      models: [
+        {
+          name: 'm',
+          label: 'M',
+          fields: [
+            { name: 'f', label: 'F', type: 'number', required: false, onUpdate: 'cascade' } as never,
+          ],
+        },
+      ],
+    });
+    expect(result.ok).toBe(false);
+  });
+});
+
+/**
+ * クロスモデル整合性 — targetModel が他モデルとして実在するか、
+ * targetLabelField が参照先モデルの実在フィールドか、をドキュメント単位で検査する。
+ */
+describe('validateDocument cross-model references', () => {
+  it('targetModel がドキュメント内に存在しなければ弾く', () => {
+    const doc: ModelDefinitionDocument = {
+      version: 1,
+      models: [
+        {
+          name: 'employee',
+          label: '従業員',
+          fields: [
+            { name: 'dept', label: '部署', type: 'reference', required: false, targetModel: 'nonExistent' },
+          ],
+        },
+      ],
+    };
+    const result = validateDocument(doc);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.some((e) => e.includes('does not match any model'))).toBe(true);
+    }
+  });
+
+  it('targetLabelField が参照先モデルに存在しなければ弾く', () => {
+    const doc: ModelDefinitionDocument = {
+      version: 1,
+      models: [
+        {
+          name: 'department',
+          label: '部署',
+          fields: [{ name: 'name', label: '名前', type: 'string', required: true }],
+        },
+        {
+          name: 'employee',
+          label: '従業員',
+          fields: [
+            {
+              name: 'dept',
+              label: '部署',
+              type: 'reference',
+              required: false,
+              targetModel: 'department',
+              targetLabelField: 'noSuchField',
+            },
+          ],
+        },
+      ],
+    };
+    const result = validateDocument(doc);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.some((e) => e.includes('is not a field of model'))).toBe(true);
+    }
+  });
+
+  it('targetModel / targetLabelField が共に有効なら通る', () => {
+    const doc: ModelDefinitionDocument = {
+      version: 1,
+      models: [
+        {
+          name: 'department',
+          label: '部署',
+          fields: [{ name: 'name', label: '名前', type: 'string', required: true }],
+        },
+        {
+          name: 'employee',
+          label: '従業員',
+          fields: [
+            {
+              name: 'dept',
+              label: '部署',
+              type: 'reference',
+              required: false,
+              targetModel: 'department',
+              targetLabelField: 'name',
+            },
+          ],
+        },
+      ],
+    };
+    expect(validateDocument(doc).ok).toBe(true);
+  });
+
+  it('reference 以外のフィールドはクロスチェックの対象外', () => {
+    // type:string のフィールドに targetModel/targetLabelField が付いてもクロスチェックは走らない
+    // (型単位のバリデーション側で別エラーは出るが、クロスチェック自体は副作用ゼロ)
+    const doc: ModelDefinitionDocument = {
+      version: 1,
+      models: [
+        {
+          name: 'a',
+          label: 'A',
+          fields: [{ name: 'f', label: 'F', type: 'string', required: false }],
+        },
+      ],
+    };
+    expect(validateDocument(doc).ok).toBe(true);
+  });
+});

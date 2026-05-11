@@ -158,6 +158,7 @@ export function ModelDesignerView({ api }: { api: ApiClient }) {
             model={model}
             onChange={(next) => vm.replaceModel(mi, next)}
             onRemoveModel={() => vm.removeModel(mi)}
+            knownModelNames={vm.document.models.map((m) => m.name).filter((n) => n !== '')}
           />
         </div>
       ))}

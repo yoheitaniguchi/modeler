@@ -4,7 +4,10 @@ import type {
   FieldType,
   ModelDefinition,
   ModelDefinitionDocument,
+  RelationKind,
+  ReferentialAction,
 } from './model.js';
+import { RELATION_KINDS, REFERENTIAL_ACTIONS } from './model.js';
 
 /**
  * バリデーション関数群。
@@ -74,6 +77,35 @@ export function validateFieldDefinition(field: unknown, path: string): string[] 
     }
     if (f.targetLabelField !== undefined && (typeof f.targetLabelField !== 'string' || f.targetLabelField.trim() === '')) {
       errors.push(`${path}.targetLabelField: must be non-empty string when provided`);
+    }
+  }
+
+  // relationKind / onDelete / onUpdate は reference 型でのみ有効。
+  // manyToMany は型として将来互換のために受け入れるが、ランタイムでは現状未対応。
+  if (f.relationKind !== undefined) {
+    if (f.type !== 'reference') {
+      errors.push(`${path}.relationKind: only valid when type is "reference"`);
+    } else if (!RELATION_KINDS.includes(f.relationKind as RelationKind)) {
+      errors.push(`${path}.relationKind: must be one of ${RELATION_KINDS.join(', ')}`);
+    } else if (f.relationKind === 'manyToMany') {
+      errors.push(`${path}.relationKind: 'manyToMany' is not yet supported`);
+    }
+  }
+  if (f.onDelete !== undefined) {
+    if (f.type !== 'reference') {
+      errors.push(`${path}.onDelete: only valid when type is "reference"`);
+    } else if (!REFERENTIAL_ACTIONS.includes(f.onDelete as ReferentialAction)) {
+      errors.push(`${path}.onDelete: must be one of ${REFERENTIAL_ACTIONS.join(', ')}`);
+    } else if (f.onDelete === 'setNull' && f.required === true) {
+      // setNull は NOT NULL カラムには適用できない (整合性が壊れる)
+      errors.push(`${path}.onDelete: 'setNull' cannot be used when required is true`);
+    }
+  }
+  if (f.onUpdate !== undefined) {
+    if (f.type !== 'reference') {
+      errors.push(`${path}.onUpdate: only valid when type is "reference"`);
+    } else if (!REFERENTIAL_ACTIONS.includes(f.onUpdate as ReferentialAction)) {
+      errors.push(`${path}.onUpdate: must be one of ${REFERENTIAL_ACTIONS.join(', ')}`);
     }
   }
 
@@ -322,7 +354,62 @@ export function validateDocument(doc: unknown): ValidationResult {
     }
   });
 
+  // モデル単位のバリデーションを通った後で「モデル間」の整合性を確認する。
+  // 個別フィールドが壊れていると targetModel 解決が無意味なので、後段で実施。
+  errors.push(...validateCrossModelReferences(d.models));
+
   return errors.length === 0 ? { ok: true } : { ok: false, errors };
+}
+
+/**
+ * reference フィールドの targetModel / targetLabelField がドキュメント内のモデル/フィールドを
+ * 指しているか確認する。クロスモデルチェックは validateModelDefinition では行えないためここに集約。
+ */
+function validateCrossModelReferences(models: unknown[]): string[] {
+  const errors: string[] = [];
+  // モデル名 → フィールド名集合 を構築
+  const fieldNamesByModel = new Map<string, Set<string>>();
+  for (const m of models) {
+    if (typeof m !== 'object' || m === null) continue;
+    const mm = m as Partial<ModelDefinition>;
+    if (typeof mm.name !== 'string' || !Array.isArray(mm.fields)) continue;
+    const names = new Set<string>();
+    for (const f of mm.fields) {
+      if (typeof f === 'object' && f !== null) {
+        const fn = (f as Partial<FieldDefinition>).name;
+        if (typeof fn === 'string') names.add(fn);
+      }
+    }
+    fieldNamesByModel.set(mm.name, names);
+  }
+
+  models.forEach((m, mi) => {
+    if (typeof m !== 'object' || m === null) return;
+    const mm = m as Partial<ModelDefinition>;
+    if (!Array.isArray(mm.fields)) return;
+    mm.fields.forEach((f, fi) => {
+      if (typeof f !== 'object' || f === null) return;
+      const ff = f as Partial<FieldDefinition>;
+      if (ff.type !== 'reference') return;
+      const path = `document.models[${mi}].fields[${fi}]`;
+      if (typeof ff.targetModel === 'string' && ff.targetModel.trim() !== '') {
+        const targetFields = fieldNamesByModel.get(ff.targetModel);
+        if (!targetFields) {
+          errors.push(`${path}.targetModel: "${ff.targetModel}" does not match any model in document`);
+        } else if (
+          typeof ff.targetLabelField === 'string' &&
+          ff.targetLabelField.trim() !== '' &&
+          !targetFields.has(ff.targetLabelField)
+        ) {
+          errors.push(
+            `${path}.targetLabelField: "${ff.targetLabelField}" is not a field of model "${ff.targetModel}"`,
+          );
+        }
+      }
+    });
+  });
+
+  return errors;
 }
 
 /**

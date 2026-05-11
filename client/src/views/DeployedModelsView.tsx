@@ -114,6 +114,7 @@ export function DeployedModelsView({ api }: { api: ApiClient }) {
           onCancel={() => { setEditing(false); setEditErrors([]); }}
           saving={saving}
           errors={editErrors}
+          knownModelNames={models.map((m) => m.name)}
         />
       )}
 

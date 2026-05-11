@@ -30,6 +30,26 @@ export interface FieldFormatters {
   fullWidthToHalfWidth?: boolean; // 全角英数字を半角に変換
 }
 
+/** リレーションのカーディナリティ。manyToMany は型としては受け入れるが現状ランタイム未対応。 */
+export type RelationKind = 'oneToOne' | 'oneToMany' | 'manyToMany';
+
+/** FK の onDelete / onUpdate に指定できる挙動。 */
+export type ReferentialAction = 'restrict' | 'cascade' | 'setNull' | 'noAction';
+
+/** リテラル配列。バリデーション / UI で網羅列挙に使う。 */
+export const RELATION_KINDS: readonly RelationKind[] = ['oneToOne', 'oneToMany', 'manyToMany'];
+export const REFERENTIAL_ACTIONS: readonly ReferentialAction[] = [
+  'restrict',
+  'cascade',
+  'setNull',
+  'noAction',
+];
+
+/** 各 prop が未指定だった場合の解釈に使うデフォルト。サーバー / SQL / UI で共有。 */
+export const DEFAULT_RELATION_KIND: RelationKind = 'oneToMany';
+export const DEFAULT_ON_DELETE: ReferentialAction = 'restrict';
+export const DEFAULT_ON_UPDATE: ReferentialAction = 'noAction';
+
 /** 1 つのフィールド (テーブルでいうカラム相当) の定義。 */
 export interface FieldDefinition {
   /** プログラム上の識別子。英数とアンダースコアのみ (バリデーションで強制)。 */
@@ -48,6 +68,12 @@ export interface FieldDefinition {
   targetModel?: string;
   /** type='reference' の場合に表示ラベルとして使う参照先モデルのフィールド名。 */
   targetLabelField?: string;
+  /** type='reference' の場合のカーディナリティ。未指定は oneToMany 扱い。 */
+  relationKind?: RelationKind;
+  /** type='reference' の場合、参照先削除時の挙動。未指定は restrict 扱い。 */
+  onDelete?: ReferentialAction;
+  /** type='reference' の場合、参照先 ID 更新時の挙動。ID は UUID で不変のためランタイムでは無視、SQL DDL のみで意味を持つ。未指定は noAction 扱い。 */
+  onUpdate?: ReferentialAction;
   /** バリデーションルール。 */
   validation?: FieldValidation;
   /** フォーマッタ設定。 */
