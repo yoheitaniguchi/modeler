@@ -61,9 +61,9 @@ describe('一括インポート / エクスポート API', () => {
       expect(res.headers['content-type']).toMatch(/tab-separated/);
       expect(res.text).toContain('name\tage\tactive');
       expect(res.text).toContain('Alice');
-      // ファイル名が {modelName}-{yyyymmdd}-{hhmmss}.tsv 形式になっている
+      // ファイル名が {modelName}{yyyymmdd}-{hhmmss}.tsv 形式になっている
       const cd = res.headers['content-disposition'] as string;
-      expect(cd).toMatch(/filename="customer-\d{8}-\d{6}\.tsv"/);
+      expect(cd).toMatch(/filename="customer\d{8}-\d{6}\.tsv"/);
     });
 
     it('JSON フォーマットでエクスポートできる', async () => {
@@ -73,9 +73,9 @@ describe('一括インポート / エクスポート API', () => {
       expect(res.headers['content-type']).toMatch(/application\/json/);
       const data = JSON.parse(res.text) as { name: string }[];
       expect(data[0].name).toBe('Bob');
-      // ファイル名が {modelName}-{yyyymmdd}-{hhmmss}.json 形式になっている
+      // ファイル名が {modelName}{yyyymmdd}-{hhmmss}.json 形式になっている
       const cd = res.headers['content-disposition'] as string;
-      expect(cd).toMatch(/filename="customer-\d{8}-\d{6}\.json"/);
+      expect(cd).toMatch(/filename="customer\d{8}-\d{6}\.json"/);
     });
 
     it('不正なフォーマットは 400 を返す', async () => {

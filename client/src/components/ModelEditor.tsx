@@ -23,12 +23,14 @@ import { SqlExportButton } from './SqlExportButton.js';
  * 共有層の `isValidIdentifier` を使ってサーバー側と判定基準を揃える。
  */
 
-const FIELD_TYPES: FieldType[] = ['string', 'number', 'boolean', 'date', 'reference'];
+const FIELD_TYPES: FieldType[] = ['string', 'number', 'boolean', 'date', 'reference', 'id'];
 
 const NAME_HINT = '英字始まり / 英数字とアンダースコアのみ。API パスや DB カラム名に使われます。';
 const TYPE_HINT = 'string / number / boolean / date のいずれか。型を変えるとデフォルト値はクリアされます。';
 const OPTIONS_URL_HINT =
   'string 型のセレクトボックス用。指定 URL の GET レスポンス (string[] または {id,label}[]) を選択肢に使います。';
+const NUMBERING_URL_HINT =
+  'id 型用の自動採番 API。GET レスポンス (テキストまたは {id,number,value,code} を含む JSON) を新しい ID として利用します。未指定時は UUID が自動設定されます。';
 
 const RELATION_KIND_LABEL: Record<RelationKind, string> = {
   oneToOne: '1 : 1',
@@ -271,19 +273,20 @@ export function ModelEditor({
             <table className="fields-table" style={{ marginTop: '0.6rem', fontSize: '0.9rem', width: '100%', minWidth: '850px' }}>
         <thead>
           <tr>
-            <th style={{ width: '14%' }}>
+            <th style={{ width: '13%' }}>
               name <HelpTip text={NAME_HINT} label="フィールド名のヘルプ" />
             </th>
-            <th style={{ width: '14%' }}>label</th>
-            <th style={{ width: '12%' }}>
+            <th style={{ width: '13%' }}>label</th>
+            <th style={{ width: '10%' }}>
               type <HelpTip text={TYPE_HINT} label="型のヘルプ" />
             </th>
-            <th style={{ width: '8%' }}>必須</th>
-            <th style={{ width: '18%' }}>デフォルト値</th>
-            <th style={{ width: '18%' }}>
-              optionsUrl <HelpTip text={OPTIONS_URL_HINT} label="optionsUrl のヘルプ" />
+            <th style={{ width: '6%' }}>必須</th>
+            <th style={{ width: '7%' }}>主キー</th>
+            <th style={{ width: '16%' }}>デフォルト値</th>
+            <th style={{ width: '20%' }}>
+              API連携 (選択肢 / 採番) <HelpTip text={`${OPTIONS_URL_HINT}\n\n${NUMBERING_URL_HINT}`} label="API連携のヘルプ" />
             </th>
-            <th style={{ width: '16%' }}></th>
+            <th style={{ width: '15%' }}></th>
           </tr>
         </thead>
         <tbody>
@@ -343,6 +346,20 @@ export function ModelEditor({
                     onChange={(e) => updateField(fi, { required: e.target.checked })}
                   />
                 </td>
+                <td style={{ textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={field.primaryKey ?? false}
+                    onChange={(e) => {
+                      const isPk = e.target.checked;
+                      updateField(fi, {
+                        primaryKey: isPk,
+                        // 主キーなら必須も自動ONにする
+                        required: isPk ? true : field.required,
+                      });
+                    }}
+                  />
+                </td>
                 <td>
                   <DefaultValueInput
                     field={field}
@@ -358,8 +375,17 @@ export function ModelEditor({
                       onChange={(e) => updateField(fi, { optionsUrl: e.target.value || undefined })}
                       style={{ fontSize: '0.9rem' }}
                     />
+                  ) : field.type === 'id' ? (
+                    <input
+                      type="text"
+                      value={field.numberingUrl ?? ''}
+                      placeholder="/api/numbering"
+                      onChange={(e) => updateField(fi, { numberingUrl: e.target.value || undefined })}
+                      style={{ fontSize: '0.9rem' }}
+                      data-testid={`field-numbering-url-${fi}`}
+                    />
                   ) : (
-                    <span className="muted" style={{ fontSize: '0.8rem' }}>(string型のみ)</span>
+                    <span className="muted" style={{ fontSize: '0.8rem' }}>(string型/id型のみ)</span>
                   )}
                 </td>
                 <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
@@ -406,7 +432,7 @@ export function ModelEditor({
               </tr>
               {expandedRow === fi && (
                 <tr>
-                  <td colSpan={7} style={{ backgroundColor: '#f9f9f9', padding: '0.8rem', borderBottom: '1px solid #ddd' }}>
+                  <td colSpan={8} style={{ backgroundColor: '#f9f9f9', padding: '0.8rem', borderBottom: '1px solid #ddd' }}>
                     <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
                       {field.type === 'reference' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: '280px' }}>
@@ -553,6 +579,26 @@ export function ModelEditor({
                           </label>
                         </div>
                       )}
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: '200px' }}>
+                        <strong>画面表示設定</strong>
+                        <label style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <input
+                            type="checkbox"
+                            checked={field.showInList ?? true}
+                            onChange={(e) => updateField(fi, { showInList: e.target.checked })}
+                          />
+                          一覧画面に表示する
+                        </label>
+                        <label style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <input
+                            type="checkbox"
+                            checked={field.showInDetail ?? true}
+                            onChange={(e) => updateField(fi, { showInDetail: e.target.checked })}
+                          />
+                          詳細・編集画面に表示する
+                        </label>
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -669,6 +715,23 @@ function DefaultValueInput({
           <option value="true">true</option>
           <option value="false">false</option>
         </select>
+      );
+    case 'id':
+      return (
+        <span className="muted" style={{ fontSize: '0.85rem' }}>(自動採番)</span>
+      );
+    case 'reference':
+      return (
+        <div style={{ display: 'flex', gap: '0.3rem' }}>
+          <input
+            type="text"
+            value={(value as string) ?? ''}
+            placeholder="(なし)"
+            onChange={(e) => onChange(e.target.value === '' ? undefined : e.target.value)}
+            style={{ fontSize: '0.9rem', flex: 1 }}
+          />
+          {value !== undefined && <button className="ghost" onClick={clear} style={{ padding: '0.2rem 0.4rem', fontSize: '0.8rem' }}>✕</button>}
+        </div>
       );
   }
 }

@@ -25,7 +25,7 @@ export type ValidationResult =
   | { ok: true }
   | { ok: false; errors: string[] };
 
-const FIELD_TYPES: readonly FieldType[] = ['string', 'number', 'boolean', 'date', 'reference'];
+const FIELD_TYPES: readonly FieldType[] = ['string', 'number', 'boolean', 'date', 'reference', 'id'];
 
 /** 識別子は英字始まり + 英数アンダースコア。SQL 予約語っぽい衝突を避ける素朴なルール。 */
 export const IDENTIFIER_PATTERN = /^[a-zA-Z][a-zA-Z0-9_]*$/;
@@ -53,6 +53,22 @@ export function validateFieldDefinition(field: unknown, path: string): string[] 
   }
   if (typeof f.required !== 'boolean') {
     errors.push(`${path}.required: must be boolean`);
+  }
+  if (f.primaryKey !== undefined && typeof f.primaryKey !== 'boolean') {
+    errors.push(`${path}.primaryKey: must be boolean`);
+  }
+  if (f.showInList !== undefined && typeof f.showInList !== 'boolean') {
+    errors.push(`${path}.showInList: must be boolean`);
+  }
+  if (f.showInDetail !== undefined && typeof f.showInDetail !== 'boolean') {
+    errors.push(`${path}.showInDetail: must be boolean`);
+  }
+  if (f.numberingUrl !== undefined) {
+    if (typeof f.numberingUrl !== 'string' || f.numberingUrl.trim() === '') {
+      errors.push(`${path}.numberingUrl: must be non-empty string when provided`);
+    } else if (f.type !== 'id') {
+      errors.push(`${path}.numberingUrl: only valid when type is "id"`);
+    }
   }
 
   // デフォルト値が指定されていれば、型チェック。undefined/null は常に OK。
@@ -161,6 +177,8 @@ function validateDefaultValue(type: FieldType, value: unknown): string | null {
     case 'date':
       return typeof value === 'string' && !Number.isNaN(Date.parse(value)) ? null : 'must be ISO date string';
     case 'reference':
+      return typeof value === 'string' ? null : 'must be string ID';
+    case 'id':
       return typeof value === 'string' ? null : 'must be string ID';
     default:
       return 'unknown type';
@@ -424,8 +442,9 @@ export function validateRecord(
   for (const field of model.fields) {
     const value = record[field.name];
     const isEmpty = value === undefined || value === null || value === '';
-    if (field.required && isEmpty) {
-      errors.push(`${field.name}: is required (NOT NULL)`);
+    const isRequired = field.required || field.primaryKey === true;
+    if (isRequired && isEmpty) {
+      errors.push(`${field.name}: is required`);
       continue;
     }
     if (isEmpty) continue; // optional な空値は OK
@@ -433,6 +452,7 @@ export function validateRecord(
     switch (field.type) {
       case 'string':
       case 'reference': // reference も基本は ID なので string
+      case 'id': // id 型も文字列
         if (typeof value !== 'string') {
           errors.push(`${field.name}: must be string`);
         } else {

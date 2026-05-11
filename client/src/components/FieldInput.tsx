@@ -34,6 +34,18 @@ export function FieldInput({
   }
 
   switch (field.type) {
+    case 'id':
+      return (
+        <input
+          type="text"
+          {...common}
+          value={(value as string) ?? ''}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={true}
+          placeholder={`${field.label} (自動採番)`}
+          style={{ backgroundColor: '#f3f4f6', cursor: 'not-allowed' }}
+        />
+      );
     case 'reference':
     case 'string':
       return (

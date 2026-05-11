@@ -70,7 +70,7 @@ export function createCrudRouter(model: ModelDefinition, dataDir: string): {
     const timestamp =
       `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}` +
       `-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-    const filename = `${model.name}-${timestamp}.${ext}`;
+    const filename = `${model.name}${timestamp}.${ext}`;
     res.setHeader('Content-Type', `${mimeMap[format]}; charset=utf-8`);
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(content);

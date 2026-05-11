@@ -558,3 +558,63 @@ describe('validateDocument cross-model references', () => {
     expect(validateDocument(doc).ok).toBe(true);
   });
 });
+
+describe('primaryKey, id type, and display settings validation', () => {
+  it('validates id type and numberingUrl successfully', () => {
+    const doc: ModelDefinitionDocument = {
+      version: 1,
+      models: [
+        {
+          name: 'user',
+          label: 'ユーザー',
+          fields: [
+            { name: 'uid', label: 'UID', type: 'id', required: true, primaryKey: true, numberingUrl: '/api/number' },
+            { name: 'email', label: 'メール', type: 'string', required: true, showInList: false, showInDetail: true },
+          ],
+        },
+      ],
+    };
+    expect(validateDocument(doc).ok).toBe(true);
+  });
+
+  it('rejects numberingUrl when type is not id', () => {
+    const doc: ModelDefinitionDocument = {
+      version: 1,
+      models: [
+        {
+          name: 'user',
+          label: 'ユーザー',
+          fields: [
+            { name: 'email', label: 'メール', type: 'string', required: true, numberingUrl: '/api/number' },
+          ],
+        },
+      ],
+    };
+    const result = validateDocument(doc);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.some((e) => e.includes('numberingUrl: only valid when type is "id"'))).toBe(true);
+    }
+  });
+
+  it('enforces primaryKey as required in validateRecord', () => {
+    const model: ModelDefinition = {
+      name: 'user',
+      label: 'ユーザー',
+      fields: [
+        { name: 'uid', label: 'UID', type: 'id', required: false, primaryKey: true },
+        { name: 'name', label: '名前', type: 'string', required: false },
+      ],
+    };
+    // uid is empty -> should fail because uid is primaryKey
+    const resEmpty = validateRecord(model, { name: 'テスト' });
+    expect(resEmpty.ok).toBe(false);
+    if (!resEmpty.ok) {
+      expect(resEmpty.errors.some((e) => e.includes('uid: is required'))).toBe(true);
+    }
+
+    // uid is provided -> should succeed
+    const resOk = validateRecord(model, { uid: '123', name: 'テスト' });
+    expect(resOk.ok).toBe(true);
+  });
+});

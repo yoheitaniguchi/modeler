@@ -22,6 +22,17 @@ import { buildRequestBody, TemplateError } from '../services/template.js';
  *   - カスタムボタン (scope=screen/row, kind=http) を ui.buttons で追加可能
  */
 
+function getExportFilename(modelName: string): string {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const hh = String(now.getHours()).padStart(2, '0');
+  const min = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
+  return `${modelName}${yyyy}${mm}${dd}-${hh}${min}${ss}.tsv`;
+}
+
 export function CrudView({ api, model }: { api: ApiClient; model: ModelDefinition }) {
   const vm = useCrudViewModel(api, model);
   const [confirm, setConfirm] = useState<{ message: string; onOk: () => void } | null>(null);
@@ -183,11 +194,11 @@ export function CrudView({ api, model }: { api: ApiClient; model: ModelDefinitio
             onClick={() => setBulkImportOpen(true)}
             data-testid="bulk-import-button"
           >
-            一括登録
+            インポート
           </button>
           <a
             href={api.exportUrl(model.name, 'tsv')}
-            download
+            download={getExportFilename(model.name)}
             className="button ghost"
             data-testid="export-button"
             style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem', borderRadius: '4px', border: '1px solid #d1d5db', background: 'white', textDecoration: 'none', display: 'inline-block', cursor: 'pointer' }}
@@ -218,7 +229,7 @@ export function CrudView({ api, model }: { api: ApiClient; model: ModelDefinitio
       {actionNotice && <div className="notice">{actionNotice}</div>}
 
       <SearchBar
-        fields={model.fields}
+        fields={model.fields.filter((f) => f.showInList !== false)}
         keyword={vm.keyword}
         filters={vm.filters}
         onKeywordChange={vm.setKeyword}
@@ -230,7 +241,7 @@ export function CrudView({ api, model }: { api: ApiClient; model: ModelDefinitio
       <table>
         <thead>
           <tr>
-            {model.fields.map((f) => (
+            {model.fields.filter((f) => f.showInList !== false).map((f) => (
               <th
                 key={f.name}
                 onClick={() => vm.toggleSort(f.name)}
@@ -246,14 +257,14 @@ export function CrudView({ api, model }: { api: ApiClient; model: ModelDefinitio
         </thead>
         <tbody>
           {vm.loading && (
-            <tr><td colSpan={model.fields.length + 1} className="muted">読み込み中…</td></tr>
+            <tr><td colSpan={model.fields.filter((f) => f.showInList !== false).length + 1} className="muted">読み込み中…</td></tr>
           )}
           {!vm.loading && vm.filteredRecords.length === 0 && (
-            <tr><td colSpan={model.fields.length + 1} className="muted">レコードがありません</td></tr>
+            <tr><td colSpan={model.fields.filter((f) => f.showInList !== false).length + 1} className="muted">レコードがありません</td></tr>
           )}
           {vm.filteredRecords.map((record) => (
             <tr key={record.id}>
-              {model.fields.map((f) => (
+              {model.fields.filter((f) => f.showInList !== false).map((f) => (
                 <td key={f.name}>{renderValue(record[f.name])}</td>
               ))}
               <td>

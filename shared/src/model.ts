@@ -11,8 +11,8 @@
  *   3. JSON 入出力時のバリデーションが書きやすい (validation.ts 参照)
  */
 
-/** サポートするフィールドの型。要件で string / number / boolean / date に加え、他モデルへの参照 reference を追加。 */
-export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'reference';
+/** サポートするフィールドの型。要件で string / number / boolean / date / reference に加え、UUID/カスタムAPI採番用の id を追加。 */
+export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'reference' | 'id';
 
 /** 高度なバリデーション設定。 */
 export interface FieldValidation {
@@ -60,10 +60,18 @@ export interface FieldDefinition {
   type: FieldType;
   /** true なら NOT NULL 制約。空値を許さない。 */
   required: boolean;
+  /** 主キーフラグ。単一または複数の主キーを指定可能。 */
+  primaryKey?: boolean;
+  /** 一覧画面に表示するかどうか（未指定は true 扱い）。 */
+  showInList?: boolean;
+  /** 詳細・編集画面に表示するかどうか（未指定は true 扱い）。 */
+  showInDetail?: boolean;
   /** デフォルト値。新規作成時にこの値で埋める。型に応じた値、または undefined/null で「値なし」。 */
   defaultValue?: unknown;
   /** type='string' フィールドの場合、selectbox の選択肢を取得する API エンドポイント。 */
   optionsUrl?: string;
+  /** type='id' の場合の自動採番 API エンドポイント。 */
+  numberingUrl?: string;
   /** type='reference' の場合の参照先モデル名。 */
   targetModel?: string;
   /** type='reference' の場合に表示ラベルとして使う参照先モデルのフィールド名。 */
