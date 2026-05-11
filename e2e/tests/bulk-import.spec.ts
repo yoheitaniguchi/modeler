@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { deployCustomer, gotoDeployedTab, newApiContext, resetDeployedModels } from './helpers.js';
+import { deployCustomer, gotoUserMode, newApiContext, resetDeployedModels } from './helpers.js';
 
 test.describe('一括インポート / エクスポート', () => {
   test.beforeEach(async () => {
@@ -10,15 +10,15 @@ test.describe('一括インポート / エクスポート', () => {
   });
 
   test('一括登録ボタンでモーダルが開く', async ({ page }) => {
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
     await page.getByTestId('bulk-import-button').click();
     await expect(page.getByTestId('bulk-import-modal')).toBeVisible();
   });
 
   test('モーダル内のフォーマット選択ラジオ (CSV/TSV/JSON) が切り替えられる', async ({ page }) => {
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
     await page.getByTestId('bulk-import-button').click();
 
     // デフォルトは CSV
@@ -36,8 +36,8 @@ test.describe('一括インポート / エクスポート', () => {
   test('正常な CSV をアップロードすると検証 OK → 登録 → 一覧に表示される', async ({
     page,
   }) => {
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
     await page.getByTestId('bulk-import-button').click();
 
     const csv = 'name,age,active\nAlice,30,true\nBob,25,false';
@@ -66,8 +66,8 @@ test.describe('一括インポート / エクスポート', () => {
   test('required フィールドが欠けた CSV はエラー表示 + ログダウンロードボタン', async ({
     page,
   }) => {
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
     await page.getByTestId('bulk-import-button').click();
 
     const badCsv = 'name,age,active\n,30,true';
@@ -101,8 +101,8 @@ test.describe('一括インポート / エクスポート', () => {
     });
     await api.dispose();
 
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
 
     // TestUser が一覧に表示される
     await expect(page.getByRole('cell', { name: 'TestUser', exact: true })).toBeVisible();
@@ -121,8 +121,8 @@ test.describe('一括インポート / エクスポート', () => {
   });
 
   test('エクスポートボタンのリンクが TSV 形式になっている', async ({ page }) => {
-    await gotoDeployedTab(page);
-    await page.getByTestId('model-select').selectOption('customer');
+    await gotoUserMode(page);
+    await page.getByTestId('deployed-model-link-customer').click();
 
     // エクスポートボタンは常に TSV
     const href = await page.getByTestId('export-button').getAttribute('href');
