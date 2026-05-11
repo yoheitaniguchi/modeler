@@ -70,7 +70,7 @@ export class JsonFileDao {
 
   async get(id: string): Promise<ModelRecord | null> {
     const all = await this.list();
-    return all.find((r) => r.id === id) ?? null;
+    return all.find((r) => String(r.id) === String(id)) ?? null;
   }
 
   async create(input: Record<string, unknown>): Promise<ModelRecord> {
@@ -99,13 +99,13 @@ export class JsonFileDao {
     await this.checkOutgoingFkExist(formatted);
     return this.serialize(async () => {
       const all = await this.readAll();
-      const idx = all.findIndex((r) => r.id === id);
+      const idx = all.findIndex((r) => String(r.id) === String(id));
       if (idx === -1) return null;
       if (this.model.softDelete && all[idx]._deleted) return null; // Cannot update soft-deleted record
 
       this.checkUniqueConstraints(formatted, all, id);
-      // id, _deleted は不変または上書き禁止
-      all[idx] = { ...formatted, id, _deleted: all[idx]._deleted };
+      // id, _deleted は不変または上書き禁止 (オリジナルの id の型を維持するため all[idx].id を使用)
+      all[idx] = { ...formatted, id: all[idx].id, _deleted: all[idx]._deleted };
       await this.persist(all);
       return all[idx];
     });
@@ -124,7 +124,7 @@ export class JsonFileDao {
 
     return this.serialize(async () => {
       const all = await this.readAll();
-      const idx = all.findIndex((r) => r.id === id);
+      const idx = all.findIndex((r) => String(r.id) === String(id));
       if (idx === -1) return false;
 
       if (this.model.softDelete) {
@@ -133,7 +133,7 @@ export class JsonFileDao {
         await this.persist(all);
         return true;
       } else {
-        const next = all.filter((r) => r.id !== id);
+        const next = all.filter((r) => String(r.id) !== String(id));
         if (next.length === all.length) return false;
         await this.persist(next);
         return true;
@@ -203,7 +203,7 @@ export class JsonFileDao {
     for (const inc of incomings) {
       if (inc.field.onDelete !== 'restrict' && inc.field.onDelete !== 'noAction') continue;
       const all = await inc.otherDao.list();
-      const blockers = all.filter((r) => r[inc.field.name] === id);
+      const blockers = all.filter((r) => String(r[inc.field.name]) === String(id));
       if (blockers.length > 0) {
         blockErrors.push(
           `cannot delete: ${inc.otherModel.name}.${inc.field.name} still references this id (${blockers.length} record${blockers.length === 1 ? '' : 's'})`,
@@ -216,13 +216,13 @@ export class JsonFileDao {
     for (const inc of incomings) {
       if (inc.field.onDelete === 'cascade') {
         const all = await inc.otherDao.list();
-        const targets = all.filter((r) => r[inc.field.name] === id);
+        const targets = all.filter((r) => String(r[inc.field.name]) === String(id));
         for (const t of targets) {
           await inc.otherDao.remove(t.id, visited);
         }
       } else if (inc.field.onDelete === 'setNull') {
         const all = await inc.otherDao.list();
-        const targets = all.filter((r) => r[inc.field.name] === id);
+        const targets = all.filter((r) => String(r[inc.field.name]) === String(id));
         for (const t of targets) {
           // _deleted / id は update 側で保持されるので除外したペイロードを渡す
           const { id: _id, _deleted, ...rest } = t;
@@ -244,7 +244,7 @@ export class JsonFileDao {
         // If softDelete is enabled, should we allow duplicates with deleted records?
         // Usually soft deleted records shouldn't block new inserts, but depends on requirements.
         // For simplicity, let's only check non-deleted records for unique constraint.
-        const dup = all.some(r => r.id !== excludeId && r._deleted !== true && r[field.name] === val);
+        const dup = all.some(r => String(r.id) !== String(excludeId) && r._deleted !== true && r[field.name] === val);
         if (dup) {
           errors.push(`${field.name}: must be unique`);
         }
