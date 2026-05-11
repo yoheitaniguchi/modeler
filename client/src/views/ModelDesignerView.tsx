@@ -8,7 +8,15 @@ import { ModelEditor } from '../components/ModelEditor.js';
  * モデル一覧 / 追加 / モード切替 / グローバルツールバーは AppShell / Sidebar が
  * 担当する。本コンポーネントには表示と入力ハンドリング以外のロジックを置かない。
  */
-export function ModelDesignerView({ vm }: { vm: ModelerViewModel }) {
+export function ModelDesignerView({
+  vm,
+  onSaveJson,
+  onLoadJson,
+}: {
+  vm: ModelerViewModel;
+  onSaveJson: () => void;
+  onLoadJson: () => void;
+}) {
   const models = vm.document.models;
   const selectedIndex = models.findIndex((m) => m.__clientId === vm.selectedKey);
   const selected = selectedIndex >= 0 ? models[selectedIndex] : null;
@@ -30,6 +38,15 @@ export function ModelDesignerView({ vm }: { vm: ModelerViewModel }) {
             onChange={(next) => vm.replaceModel(selectedIndex, next)}
             onRemoveModel={() => vm.removeModel(selectedIndex)}
             knownModelNames={models.map((m) => m.name).filter((n) => n !== '')}
+            showAdminToolbar={true}
+            onUndo={vm.undo}
+            onRedo={vm.redo}
+            onSaveJson={onSaveJson}
+            onLoadJson={onLoadJson}
+            onDeploy={vm.deploy}
+            canUndo={vm.canUndo}
+            canRedo={vm.canRedo}
+            canDeploy={models.length > 0}
           />
         </div>
       ) : (

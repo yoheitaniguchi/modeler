@@ -35,6 +35,39 @@ header.top .header-toolbar { display: flex; gap: 0.4rem; flex-wrap: wrap; }
   flex-direction: column;
   gap: 0.85rem;
   overflow-y: auto;
+  transition: width 0.25s ease-in-out, padding 0.25s ease-in-out;
+}
+
+/* 最小化されたサイドバー */
+.sidebar.is-minimized {
+  width: 60px;
+  padding: 1rem 0.4rem;
+  align-items: center;
+}
+.sidebar.is-minimized .mode-toggle,
+.sidebar.is-minimized .sidebar-section,
+.sidebar.is-minimized .reorder-hint {
+  display: none;
+}
+
+/* バーガーメニューボタン */
+.burger-menu-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.3rem;
+  color: #475569;
+  cursor: pointer;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s, color 0.2s;
+}
+.burger-menu-btn:hover {
+  background-color: #e2e8f0;
+  color: #0f172a;
 }
 .mode-toggle {
   display: grid;

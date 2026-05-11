@@ -134,64 +134,6 @@ export function AppShell({ api }: { api: ApiClient }) {
           <h1>Modeler — マスタメンテナンス開発ツール</h1>
           <span style={{ fontSize: '0.85rem', opacity: 0.8 }}>v0.1</span>
         </div>
-        {mode === 'admin' && (
-          <div className="header-toolbar" data-testid="header-toolbar">
-            <button
-              className="ghost"
-              onClick={vm.undo}
-              disabled={!vm.canUndo}
-              data-testid="undo"
-              title="元に戻す (Ctrl+Z)"
-            >
-              ⟲ 元に戻す
-            </button>
-            <button
-              className="ghost"
-              onClick={vm.redo}
-              disabled={!vm.canRedo}
-              data-testid="redo"
-              title="やり直す (Ctrl+Shift+Z)"
-            >
-              ⟳ やり直す
-            </button>
-            <button
-              className="ghost"
-              onClick={onSave}
-              data-testid="save-json"
-              title="JSON 保存 (Ctrl+S)"
-            >
-              JSON 保存
-            </button>
-            <button
-              className="ghost"
-              onClick={onLoadClick}
-              data-testid="load-json"
-              title="JSON 読込 (Ctrl+O)"
-            >
-              JSON 読込
-            </button>
-            <button
-              className="primary"
-              onClick={onDeploy}
-              disabled={vm.document.models.length === 0}
-              data-testid="deploy"
-            >
-              デプロイ
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/json"
-              style={{ display: 'none' }}
-              data-testid="load-json-input"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void onLoadFile(file);
-                e.target.value = '';
-              }}
-            />
-          </div>
-        )}
       </header>
 
       <div className="shell-body">
@@ -213,7 +155,13 @@ export function AppShell({ api }: { api: ApiClient }) {
         />
 
         <main className="main-pane">
-          {mode === 'admin' && <ModelDesignerView vm={vm} />}
+          {mode === 'admin' && (
+            <ModelDesignerView
+              vm={vm}
+              onSaveJson={onSave}
+              onLoadJson={onLoadClick}
+            />
+          )}
           {mode === 'user' && (
             <>
               {deployedLoading && <p className="muted">読み込み中…</p>}
@@ -230,29 +178,7 @@ export function AppShell({ api }: { api: ApiClient }) {
                   if (!selected) return null;
                   return (
                     <>
-                      <div className="row" style={{ marginBottom: '1rem' }}>
-                        {!deployedEditing && (
-                          <>
-                            <button
-                              className="ghost"
-                              onClick={() => {
-                                setDeployedEditing(true);
-                                setDeployedEditErrors([]);
-                              }}
-                              data-testid="edit-deployed"
-                            >
-                              定義を編集
-                            </button>
-                            <button
-                              className="danger"
-                              onClick={() => setDeployedDeleteConfirm(selected.name)}
-                              data-testid="delete-deployed"
-                            >
-                              モデルを削除
-                            </button>
-                          </>
-                        )}
-                      </div>
+
 
                       {deployedEditing && (
                         <InlineModelEditor
@@ -285,6 +211,19 @@ export function AppShell({ api }: { api: ApiClient }) {
           )}
         </main>
       </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/json"
+        style={{ display: 'none' }}
+        data-testid="load-json-input"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void onLoadFile(file);
+          e.target.value = '';
+        }}
+      />
     </div>
   );
 }

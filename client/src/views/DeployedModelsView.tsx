@@ -95,16 +95,7 @@ export function DeployedModelsView({ api }: { api: ApiClient }) {
             <option key={m.name} value={m.name}>{m.label} ({m.name})</option>
           ))}
         </select></label>
-        {current && !editing && (
-          <>
-            <button className="ghost" onClick={() => { setEditing(true); setEditErrors([]); }} data-testid="edit-deployed">
-              定義を編集
-            </button>
-            <button className="danger" onClick={() => setDeleteConfirm(current.name)} data-testid="delete-deployed">
-              モデルを削除
-            </button>
-          </>
-        )}
+
       </div>
 
       {current && editing && (

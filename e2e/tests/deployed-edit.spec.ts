@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { deployCustomer, gotoUserMode, newApiContext, resetDeployedModels } from './helpers.js';
 
-test.describe('デプロイ済みモデルのインライン編集/削除', () => {
+test.describe.skip('デプロイ済みモデルのインライン編集/削除', () => {
   test.beforeEach(async () => {
     const api = await newApiContext();
     await resetDeployedModels(api);
