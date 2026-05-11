@@ -40,7 +40,12 @@ export function App() {
           </button>
         </nav>
 
-        {tab === 'design' ? <ModelDesignerView api={api} /> : <DeployedModelsView api={api} />}
+        <div style={{ display: tab === 'design' ? 'block' : 'none' }}>
+          <ModelDesignerView api={api} />
+        </div>
+        <div style={{ display: tab === 'crud' ? 'block' : 'none' }}>
+          <DeployedModelsView api={api} />
+        </div>
       </div>
     </>
   );

@@ -118,4 +118,23 @@ test.describe('ユーザビリティ機能', () => {
 
     await expect(page.getByTestId('field-name-error-0')).toBeVisible();
   });
+
+  test('モデル設計タブとデプロイ済みモデルタブを切り替えても画面の内容がクリアされない', async ({ page }) => {
+    await gotoDesignTab(page);
+
+    await page.getByTestId('add-model').click();
+    const card = page.locator('.card').filter({ hasText: 'モデル名' }).first();
+    await card.getByPlaceholder('customer').fill('temporary-tab-switch');
+    await card.getByPlaceholder('顧客').fill('タブ切替一時');
+
+    // 「デプロイ済みモデル」タブに切り替える
+    await page.getByRole('tab', { name: /デプロイ済みモデル/ }).click();
+
+    // 「モデル設計」タブに戻る
+    await page.getByRole('tab', { name: /モデル設計/ }).click();
+
+    // 内容が消えていないことを確認
+    await expect(card.getByPlaceholder('customer')).toHaveValue('temporary-tab-switch');
+    await expect(card.getByPlaceholder('顧客')).toHaveValue('タブ切替一時');
+  });
 });
