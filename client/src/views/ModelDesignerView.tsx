@@ -153,7 +153,7 @@ export function ModelDesignerView({ api }: { api: ApiClient }) {
       )}
 
       {vm.document.models.map((model, mi) => (
-        <div className="card" key={mi}>
+        <div className="card model-design-card" key={mi}>
           <ModelEditor
             model={model}
             onChange={(next) => vm.replaceModel(mi, next)}

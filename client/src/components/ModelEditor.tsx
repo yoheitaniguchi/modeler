@@ -60,6 +60,7 @@ export function ModelEditor({
   knownModelNames?: string[];
 }) {
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
+  const [collapsed, setCollapsed] = useState<boolean>(false);
   const updateModel = (patch: Partial<ModelDefinition>) => {
     onChange({ ...model, ...patch });
   };
@@ -121,8 +122,32 @@ export function ModelEditor({
 
   return (
     <div data-testid={`model-editor-${model.name || 'unnamed'}`}>
-      <div className="row" style={{ justifyContent: 'space-between' }}>
+      <div className="row" style={{ justifyContent: 'space-between', marginBottom: collapsed ? '0' : '1.2rem' }}>
         <div className="row" style={{ alignItems: 'flex-start' }}>
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => setCollapsed(!collapsed)}
+            title={collapsed ? "展開する" : "折りたたむ"}
+            aria-label={collapsed ? "展開する" : "折りたたむ"}
+            data-testid={`toggle-collapse-${model.name || 'unnamed'}`}
+            style={{
+              padding: '0.3rem 0.5rem',
+              fontSize: '0.85rem',
+              borderRadius: '4px',
+              border: '1px solid #d1d5db',
+              backgroundColor: '#f9fafb',
+              color: '#4b5563',
+              marginTop: '1.1rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '2rem',
+              height: '2rem'
+            }}
+          >
+            {collapsed ? '▶' : '▼'}
+          </button>
           <div>
             <label>
               モデル名 <HelpTip text={NAME_HINT} label="モデル名のヘルプ" />
@@ -171,7 +196,10 @@ export function ModelEditor({
         </div>
       </div>
 
-      <table style={{ marginTop: '0.6rem', fontSize: '0.9rem' }}>
+      {!collapsed && (
+        <>
+          <div className="fields-table-wrapper" style={{ overflowX: 'auto', width: '100%', marginBottom: '0.6rem' }}>
+            <table className="fields-table" style={{ marginTop: '0.6rem', fontSize: '0.9rem', width: '100%', minWidth: '850px' }}>
         <thead>
           <tr>
             <th style={{ width: '14%' }}>
@@ -463,18 +491,21 @@ export function ModelEditor({
               </Fragment>
             );
           })}
-        </tbody>
-      </table>
-      <button className="ghost" onClick={addField} style={{ marginTop: '0.5rem' }}>
-        + フィールド追加
-      </button>
+            </tbody>
+          </table>
+        </div>
+        <button className="ghost" onClick={addField} style={{ marginTop: '0.5rem' }}>
+          + フィールド追加
+        </button>
 
-      <div style={{ marginTop: '0.8rem' }}>
-        <UiConfigEditor ui={model.ui} onChange={setUi} />
-      </div>
-      <div style={{ marginTop: '0.4rem' }}>
-        <ButtonsEditor ui={model.ui} onChange={setUi} />
-      </div>
+        <div style={{ marginTop: '0.8rem' }}>
+          <UiConfigEditor ui={model.ui} onChange={setUi} />
+        </div>
+        <div style={{ marginTop: '0.4rem' }}>
+          <ButtonsEditor ui={model.ui} onChange={setUi} />
+        </div>
+      </>
+    )}
     </div>
   );
 }
