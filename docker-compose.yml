@@ -1,0 +1,36 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    image: modeler:latest
+    container_name: modeler-app
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    volumes:
+      - modeler-data:/app/data
+      - modeler-logs:/app/log
+    environment:
+      PORT: "4000"
+      NODE_ENV: production
+      MODELER_DATA_DIR: /app/data
+      CLIENT_DIST_DIR: /app/client/dist
+      LOG_LEVEL: info
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:4000/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+volumes:
+  modeler-data:
+    driver: local
+  modeler-logs:
+    driver: local

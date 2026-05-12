@@ -1,0 +1,41 @@
+# バージョン管理
+.git/
+.gitignore
+
+# node_modules (Docker内で再インストール)
+node_modules/
+*/node_modules/
+
+# TypeScriptビルド成果物 (Docker内で再ビルド)
+*/dist/
+*.tsbuildinfo
+
+# ランタイムデータとログ
+server/data/
+log/
+*.log
+
+# E2Eテスト成果物
+e2e/playwright-report/
+e2e/test-results/
+e2e/.e2e-data/
+e2e/.cache/
+
+# エディタ・OS固有ファイル
+.vscode/
+.DS_Store
+*.swp
+*.swo
+Thumbs.db
+
+# Claude Code設定
+.claude/
+
+# ドキュメント
+doc/
+
+# GitHub Actions (コンテナ内不要)
+.github/
+
+# mise ツールチェーン設定 (Docker内不要)
+mise.toml
