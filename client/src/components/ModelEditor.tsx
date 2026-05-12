@@ -689,18 +689,38 @@ function DefaultValueInput({
           {value !== undefined && <button className="ghost" onClick={clear} style={{ padding: '0.2rem 0.4rem', fontSize: '0.8rem' }}>✕</button>}
         </div>
       );
-    case 'date':
+    case 'date': {
+      const isToday = value === 'today';
       return (
-        <div style={{ display: 'flex', gap: '0.3rem' }}>
-          <input
-            type="date"
-            value={(value as string) ?? ''}
-            onChange={(e) => onChange(e.target.value === '' ? undefined : e.target.value)}
-            style={{ fontSize: '0.9rem', flex: 1 }}
-          />
-          {value !== undefined && <button className="ghost" onClick={clear} style={{ padding: '0.2rem 0.4rem', fontSize: '0.8rem' }}>✕</button>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+            <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.2rem', whiteSpace: 'nowrap', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={isToday}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    onChange('today');
+                  } else {
+                    onChange(undefined);
+                  }
+                }}
+              />
+              今日の日付にする
+            </label>
+            {value !== undefined && <button className="ghost" onClick={clear} style={{ padding: '0.1rem 0.3rem', fontSize: '0.75rem' }}>✕</button>}
+          </div>
+          {!isToday && (
+            <input
+              type="date"
+              value={(value as string) ?? ''}
+              onChange={(e) => onChange(e.target.value === '' ? undefined : e.target.value)}
+              style={{ fontSize: '0.9rem', width: '100%' }}
+            />
+          )}
         </div>
       );
+    }
     case 'boolean':
       return (
         <select

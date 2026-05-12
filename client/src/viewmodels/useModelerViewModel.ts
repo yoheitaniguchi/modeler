@@ -32,6 +32,7 @@ export interface ModelerViewModel {
 
   addModel: () => void;
   removeModel: (index: number) => void;
+  duplicateModel: (index: number) => void;
   updateModel: (index: number, patch: Partial<ModelDefinition>) => void;
   replaceModel: (index: number, next: ModelDefinition) => void;
   /** モデルの並び順を変える (from 番目を to 番目へ)。範囲外や同位置は no-op。undo 可能。 */
@@ -129,6 +130,48 @@ export function useModelerViewModel(api: ApiClient): ModelerViewModel {
     updateModels((ms) => [...ms, m]);
     setSelectedKey(m.__clientId ?? null);
   }, [updateModels]);
+
+  const duplicateModel = useCallback(
+    (index: number) => {
+      const ms = history.state.models;
+      if (index < 0 || index >= ms.length) return;
+      const src = ms[index];
+      
+      const candidateNameBase = src.name ? `${src.name}_copy` : 'model_copy';
+      const existingNames = new Set(ms.map((m) => m.name));
+      let name = candidateNameBase;
+      let n = 2;
+      while (existingNames.has(name)) {
+        name = `${candidateNameBase}${n}`;
+        n += 1;
+      }
+
+      const candidateLabelBase = src.label ? `${src.label}_copy` : 'model_copy';
+      const existingLabels = new Set(ms.map((m) => m.label));
+      let label = candidateLabelBase;
+      let ln = 2;
+      while (existingLabels.has(label)) {
+        label = `${candidateLabelBase}${ln}`;
+        ln += 1;
+      }
+
+      const cid = newClientId();
+      const copied: ModelDefinition = {
+        ...src,
+        name,
+        label,
+        __clientId: cid,
+      };
+
+      updateModels((currentMs) => {
+        const next = [...currentMs];
+        next.splice(index + 1, 0, copied);
+        return next;
+      });
+      setSelectedKey(cid);
+    },
+    [history, updateModels],
+  );
 
   const removeModel = useCallback(
     (index: number) => {
@@ -317,6 +360,7 @@ export function useModelerViewModel(api: ApiClient): ModelerViewModel {
     notice,
     addModel,
     removeModel,
+    duplicateModel,
     updateModel,
     replaceModel,
     moveModel,

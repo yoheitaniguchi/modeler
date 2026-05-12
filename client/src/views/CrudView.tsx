@@ -40,6 +40,7 @@ export function CrudView({ api, model }: { api: ApiClient; model: ModelDefinitio
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalRecord, setModalRecord] = useState<ModelRecord | null>(null);
+  const [modalIsEdit, setModalIsEdit] = useState(false);
   const [modalSaving, setModalSaving] = useState(false);
   const [modalErrors, setModalErrors] = useState<string[]>([]);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
@@ -51,12 +52,46 @@ export function CrudView({ api, model }: { api: ApiClient; model: ModelDefinitio
 
   const openCreateModal = () => {
     setModalRecord(null);
+    setModalIsEdit(false);
     setModalErrors([]);
     setModalOpen(true);
   };
 
   const openEditModal = (record: ModelRecord) => {
     setModalRecord(record);
+    setModalIsEdit(true);
+    setModalErrors([]);
+    setModalOpen(true);
+  };
+
+  const openCopyModal = (record: ModelRecord) => {
+    const copiedForm: Record<string, unknown> = {};
+    for (const f of model.fields) {
+      if (f.type === 'id') continue;
+      const nameLower = f.name.toLowerCase();
+      if (
+        nameLower === 'createdat' ||
+        nameLower === 'updatedat' ||
+        nameLower === 'created_at' ||
+        nameLower === 'updated_at' ||
+        nameLower === 'createddate' ||
+        nameLower === 'updateddate' ||
+        nameLower === 'registrationdate' ||
+        nameLower === 'updatedate'
+      ) {
+        continue;
+      }
+      if (
+        f.label.includes('登録日') ||
+        f.label.includes('更新日') ||
+        f.label.includes('作成日')
+      ) {
+        continue;
+      }
+      copiedForm[f.name] = record[f.name];
+    }
+    setModalRecord(copiedForm as ModelRecord);
+    setModalIsEdit(false);
     setModalErrors([]);
     setModalOpen(true);
   };
@@ -67,12 +102,12 @@ export function CrudView({ api, model }: { api: ApiClient; model: ModelDefinitio
     setModalSaving(true);
     setModalErrors([]);
     try {
-      if (modalRecord) {
+      if (modalIsEdit) {
         if (overrides.update) {
           const res = await api.callCustom({
             method: overrides.update.method,
             url: overrides.update.url,
-            body: { ...form, id: modalRecord.id },
+            body: { ...form, id: modalRecord!.id },
           });
           if (!res.ok) {
             setModalErrors([`HTTP ${res.status}: ${stringifyData(res.data)}`]);
@@ -80,7 +115,7 @@ export function CrudView({ api, model }: { api: ApiClient; model: ModelDefinitio
             return;
           }
         } else {
-          await api.update(model.name, modalRecord.id, form);
+          await api.update(model.name, modalRecord!.id, form);
         }
       } else {
         if (overrides.create) {
@@ -101,6 +136,7 @@ export function CrudView({ api, model }: { api: ApiClient; model: ModelDefinitio
       await vm.reload();
       if (keepOpen) {
         setModalRecord(null);
+        setModalIsEdit(false);
       } else {
         closeModal();
       }
@@ -269,6 +305,7 @@ export function CrudView({ api, model }: { api: ApiClient; model: ModelDefinitio
               ))}
               <td>
                 <button className="ghost" onClick={() => openEditModal(record)} data-testid={`edit-${record.id}`}>更新</button>{' '}
+                <button className="ghost" onClick={() => openCopyModal(record)} data-testid={`copy-${record.id}`}>コピー</button>{' '}
                 <button className="danger" onClick={() => onDelete(record.id)} data-testid={`delete-${record.id}`}>削除</button>
                 {rowButtons.map((b) => (
                   <span key={b.id}>
@@ -299,6 +336,7 @@ export function CrudView({ api, model }: { api: ApiClient; model: ModelDefinitio
         open={modalOpen}
         model={model}
         initialRecord={modalRecord}
+        isEdit={modalIsEdit}
         saving={modalSaving}
         errors={modalErrors}
         onSave={handleModalSave}

@@ -145,6 +145,7 @@ export function AppShell({ api }: { api: ApiClient }) {
           onSelect={vm.select}
           onAddModel={vm.addModel}
           onMoveModel={vm.moveModel}
+          onDuplicateModel={vm.duplicateModel}
           draftAvailable={vm.draftAvailable}
           onRestoreDraft={vm.restoreDraft}
           onDiscardDraft={vm.discardDraft}

@@ -21,6 +21,7 @@ export interface ModelRowKebabProps {
   isLast: boolean;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  onDuplicate: () => void;
 }
 
 export function ModelRowKebab({
@@ -29,6 +30,7 @@ export function ModelRowKebab({
   isLast,
   onMoveUp,
   onMoveDown,
+  onDuplicate,
 }: ModelRowKebabProps) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -91,6 +93,15 @@ export function ModelRowKebab({
             data-testid="action-move-down"
           >
             ↓ 1つ下へ
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="row-kebab-menuitem"
+            onClick={handle(onDuplicate)}
+            data-testid="action-duplicate"
+          >
+            複製
           </button>
         </div>
       )}

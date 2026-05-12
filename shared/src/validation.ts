@@ -175,7 +175,7 @@ function validateDefaultValue(type: FieldType, value: unknown): string | null {
     case 'boolean':
       return typeof value === 'boolean' ? null : 'must be boolean';
     case 'date':
-      return typeof value === 'string' && !Number.isNaN(Date.parse(value)) ? null : 'must be ISO date string';
+      return typeof value === 'string' && (value === 'today' || !Number.isNaN(Date.parse(value))) ? null : 'must be ISO date string';
     case 'reference':
       return typeof value === 'string' ? null : 'must be string ID';
     case 'id':

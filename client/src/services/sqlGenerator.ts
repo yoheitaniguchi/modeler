@@ -70,6 +70,10 @@ function formatDefault(value: unknown, type: FieldType, dialect: SqlDialect): st
       return b ? 'True' : 'False';
     }
     case 'date':
+      if (value === 'today') {
+        if (dialect === 'postgresql' || dialect === 'sqlite') return 'CURRENT_DATE';
+        return 'Date()'; // MS Access
+      }
       return quoteSqlString(String(value));
   }
 }

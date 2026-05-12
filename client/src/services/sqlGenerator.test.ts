@@ -72,6 +72,26 @@ describe('generateCreateTable', () => {
     expect(generateCreateTable(m, 'postgresql')).toContain('DEFAULT 3.14');
   });
 
+  it('date の defaultValue: today は方言ごとの日付関数にマッピングされる', () => {
+    const m: ModelDefinition = {
+      name: 't',
+      label: 't',
+      fields: [{ name: 'd', label: 'd', type: 'date', required: false, defaultValue: 'today' }],
+    };
+    expect(generateCreateTable(m, 'postgresql')).toContain('DEFAULT CURRENT_DATE');
+    expect(generateCreateTable(m, 'sqlite')).toContain('DEFAULT CURRENT_DATE');
+    expect(generateCreateTable(m, 'msaccess')).toContain('DEFAULT Date()');
+  });
+
+  it('date の特定の defaultValue はエスケープされて文字列としてマッピングされる', () => {
+    const m: ModelDefinition = {
+      name: 't',
+      label: 't',
+      fields: [{ name: 'd', label: 'd', type: 'date', required: false, defaultValue: '2026-05-12' }],
+    };
+    expect(generateCreateTable(m, 'postgresql')).toContain("DEFAULT '2026-05-12'");
+  });
+
   it('null / undefined / NaN / Infinity は DEFAULT 句を出力しない', () => {
     const m: ModelDefinition = {
       name: 't',

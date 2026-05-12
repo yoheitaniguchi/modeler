@@ -6,6 +6,7 @@ export function RecordFormModal({
   open,
   model,
   initialRecord,
+  isEdit,
   saving,
   errors,
   onSave,
@@ -14,6 +15,7 @@ export function RecordFormModal({
   open: boolean;
   model: ModelDefinition;
   initialRecord: ModelRecord | null;
+  isEdit: boolean;
   saving: boolean;
   errors: string[];
   onSave: (form: Record<string, unknown>, keepOpen: boolean) => void;
@@ -41,7 +43,7 @@ export function RecordFormModal({
 
   if (!open) return null;
 
-  const isNewRecord = initialRecord === null;
+  const isNewRecord = !isEdit;
   const title = isNewRecord ? `${model.label}を新規作成` : `${model.label}を編集`;
 
   return (
@@ -110,11 +112,23 @@ export function RecordFormModal({
   );
 }
 
+function getTodayString(): string {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 function emptyForm(model: ModelDefinition): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const f of model.fields) {
     if (f.defaultValue !== undefined) {
-      out[f.name] = f.defaultValue;
+      if (f.type === 'date' && f.defaultValue === 'today') {
+        out[f.name] = getTodayString();
+      } else {
+        out[f.name] = f.defaultValue;
+      }
     } else {
       out[f.name] = f.type === 'boolean' ? false : '';
     }
