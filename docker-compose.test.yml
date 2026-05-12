@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile.e2e
       target: e2e-runner
+    # Playwright v1.59.1 (package-lock.json の解決バージョンに合わせる)
     image: modeler-e2e:latest
     container_name: modeler-e2e
     environment:

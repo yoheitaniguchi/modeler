@@ -30,7 +30,7 @@ RUN VITE_BASE=/ npm run build --workspace=client
 # Stage 2: e2e-runner
 # Playwright公式イメージ: ブラウザ+システム依存関係が全て内包されている。
 # =============================================================================
-FROM mcr.microsoft.com/playwright:v1.47.0-noble AS e2e-runner
+FROM mcr.microsoft.com/playwright:v1.59.1-noble AS e2e-runner
 
 # Playwright公式イメージのNode.jsをNode 24に更新
 # (公式イメージはNode 20を同梱しているが、本プロジェクトはNode 24が必要)
@@ -40,14 +40,19 @@ RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
 
 WORKDIR /app
 
-# node_modulesをbuilderからコピー (ワークスペース依存関係を含む)
-COPY --from=builder /app/node_modules        ./node_modules/
+# package.jsonをコピーしてnpm ciで依存関係をインストール
+# builderのnode_modulesをコピーしない理由:
+# builderはWindows環境のpackage-lock.jsonを使うため@playwright/testが
+# lockfileより新しいバージョンに解決される場合がある。
+# npm ciでインストールし直すことでPlaywrightライブラリと
+# イメージ内のブラウザバイナリのバージョンを一致させる。
 COPY --from=builder /app/package.json        ./package.json
 COPY --from=builder /app/package-lock.json   ./package-lock.json
 COPY --from=builder /app/shared/package.json  ./shared/package.json
 COPY --from=builder /app/server/package.json  ./server/package.json
 COPY --from=builder /app/client/package.json  ./client/package.json
 COPY --from=builder /app/e2e/package.json     ./e2e/package.json
+RUN npm ci
 
 # ビルド成果物
 COPY --from=builder /app/shared/dist  ./shared/dist/
