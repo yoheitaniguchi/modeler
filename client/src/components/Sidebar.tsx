@@ -23,6 +23,7 @@ export interface SidebarProps {
   onSelect: (key: string) => void;
   onAddModel: () => void;
   onMoveModel: (from: number, to: number) => void;
+  onDuplicateModel: (index: number) => void;
   draftAvailable: boolean;
   onRestoreDraft: () => void;
   onDiscardDraft: () => void;
@@ -42,6 +43,7 @@ export function Sidebar({
   onSelect,
   onAddModel,
   onMoveModel,
+  onDuplicateModel,
   draftAvailable,
   onRestoreDraft,
   onDiscardDraft,
@@ -154,6 +156,7 @@ export function Sidebar({
                         isLast={idx === designModels.length - 1}
                         onMoveUp={() => onMoveModel(idx, idx - 1)}
                         onMoveDown={() => onMoveModel(idx, idx + 1)}
+                        onDuplicate={() => onDuplicateModel(idx)}
                       />
                     </li>
                   );

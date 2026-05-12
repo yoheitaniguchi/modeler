@@ -20,6 +20,7 @@ describe('RecordFormModal', () => {
         open={false}
         model={mockModel}
         initialRecord={null}
+        isEdit={false}
         saving={false}
         errors={[]}
         onSave={() => {}}
@@ -35,6 +36,7 @@ describe('RecordFormModal', () => {
         open={true}
         model={mockModel}
         initialRecord={null}
+        isEdit={false}
         saving={false}
         errors={[]}
         onSave={() => {}}
@@ -52,6 +54,7 @@ describe('RecordFormModal', () => {
         open={true}
         model={mockModel}
         initialRecord={null}
+        isEdit={false}
         saving={false}
         errors={[]}
         onSave={() => {}}
@@ -68,6 +71,7 @@ describe('RecordFormModal', () => {
         open={true}
         model={mockModel}
         initialRecord={null}
+        isEdit={false}
         saving={false}
         errors={[]}
         onSave={() => {}}
@@ -84,6 +88,7 @@ describe('RecordFormModal', () => {
         open={true}
         model={mockModel}
         initialRecord={null}
+        isEdit={false}
         saving={false}
         errors={[]}
         onSave={() => {}}
@@ -101,6 +106,7 @@ describe('RecordFormModal', () => {
         open={true}
         model={mockModel}
         initialRecord={record}
+        isEdit={true}
         saving={false}
         errors={[]}
         onSave={() => {}}
@@ -120,6 +126,7 @@ describe('RecordFormModal', () => {
         open={true}
         model={mockModel}
         initialRecord={null}
+        isEdit={false}
         saving={false}
         errors={errors}
         onSave={() => {}}
@@ -139,6 +146,7 @@ describe('RecordFormModal', () => {
         open={true}
         model={mockModel}
         initialRecord={null}
+        isEdit={false}
         saving={false}
         errors={[]}
         onSave={onSave}
@@ -161,6 +169,7 @@ describe('RecordFormModal', () => {
         open={true}
         model={mockModel}
         initialRecord={null}
+        isEdit={false}
         saving={false}
         errors={[]}
         onSave={onSave}
@@ -183,6 +192,7 @@ describe('RecordFormModal', () => {
         open={true}
         model={mockModel}
         initialRecord={null}
+        isEdit={false}
         saving={false}
         errors={[]}
         onSave={() => {}}
@@ -200,6 +210,7 @@ describe('RecordFormModal', () => {
         open={true}
         model={mockModel}
         initialRecord={null}
+        isEdit={false}
         saving={true}
         errors={[]}
         onSave={() => {}}
@@ -219,6 +230,7 @@ describe('RecordFormModal', () => {
         open={true}
         model={mockModel}
         initialRecord={null}
+        isEdit={false}
         saving={false}
         errors={[]}
         onSave={onSave}
@@ -248,6 +260,7 @@ describe('RecordFormModal', () => {
         open={true}
         model={mockModel}
         initialRecord={null}
+        isEdit={false}
         saving={false}
         errors={[]}
         onSave={() => {}}

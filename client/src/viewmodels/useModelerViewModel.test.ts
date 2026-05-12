@@ -351,4 +351,24 @@ describe('useModelerViewModel', () => {
     expect(window.localStorage.getItem(DRAFT_KEY)).toBeNull();
     expect(result.current.draftAvailable).toBe(false);
   });
+
+  it('duplicateModel でモデルが複製され、名前が衝突しないように _copy が付加され、選択状態になる', () => {
+    const { result } = renderHook(() => useModelerViewModel(createFakeApi()));
+    act(() => result.current.addModel());
+    act(() => result.current.updateModel(0, { name: 'customer', label: '顧客' }));
+
+    act(() => result.current.duplicateModel(0));
+    
+    expect(result.current.document.models).toHaveLength(2);
+    expect(result.current.document.models[1].name).toBe('customer_copy');
+    expect(result.current.document.models[1].label).toBe('顧客_copy');
+    
+    const id2 = result.current.document.models[1].__clientId!;
+    expect(result.current.selectedKey).toBe(id2);
+
+    act(() => result.current.duplicateModel(0));
+    expect(result.current.document.models).toHaveLength(3);
+    expect(result.current.document.models[1].name).toBe('customer_copy2');
+    expect(result.current.document.models[1].label).toBe('顧客_copy2');
+  });
 });

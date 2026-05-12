@@ -95,6 +95,8 @@ describe('validateDocument', () => {
             { name: 'name', label: '名称', type: 'string', required: true, defaultValue: 'Unnamed' },
             { name: 'stock', label: '在庫', type: 'number', required: false, defaultValue: 0 },
             { name: 'available', label: '利用可能', type: 'boolean', required: false, defaultValue: true },
+            { name: 'created_date', label: '作成日', type: 'date', required: false, defaultValue: 'today' },
+            { name: 'updated_date', label: '更新日', type: 'date', required: false, defaultValue: '2026-05-12' },
           ],
         },
       ],
