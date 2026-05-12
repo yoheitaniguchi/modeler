@@ -1,0 +1,80 @@
+# =============================================================================
+# Stage 1: builder (本番Dockerfileと同じビルド手順)
+# =============================================================================
+FROM node:24.13.0-bookworm-slim AS builder
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY shared/package.json   ./shared/package.json
+COPY server/package.json   ./server/package.json
+COPY client/package.json   ./client/package.json
+COPY e2e/package.json      ./e2e/package.json
+
+RUN npm ci
+
+# Windows生成のロックファイルに欠落しているLinuxネイティブバイナリを補完
+RUN npm install @rollup/rollup-linux-x64-gnu @esbuild/linux-x64
+
+COPY shared/ ./shared/
+COPY server/ ./server/
+COPY client/ ./client/
+COPY e2e/    ./e2e/
+
+RUN npm run build --workspace=shared
+RUN npm run build --workspace=server
+RUN VITE_BASE=/ npm run build --workspace=client
+
+
+# =============================================================================
+# Stage 2: e2e-runner
+# Playwright公式イメージ: ブラウザ+システム依存関係が全て内包されている。
+# =============================================================================
+FROM mcr.microsoft.com/playwright:v1.59.1-noble AS e2e-runner
+
+# Playwright公式イメージのNode.jsをNode 24に更新
+# (公式イメージはNode 20を同梱しているが、本プロジェクトはNode 24が必要)
+RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# package.jsonをコピーしてnpm ciで依存関係をインストール
+# builderのnode_modulesをコピーしない理由:
+# builderはWindows環境のpackage-lock.jsonを使うため@playwright/testが
+# lockfileより新しいバージョンに解決される場合がある。
+# npm ciでインストールし直すことでPlaywrightライブラリと
+# イメージ内のブラウザバイナリのバージョンを一致させる。
+COPY --from=builder /app/package.json        ./package.json
+COPY --from=builder /app/package-lock.json   ./package-lock.json
+COPY --from=builder /app/shared/package.json  ./shared/package.json
+COPY --from=builder /app/server/package.json  ./server/package.json
+COPY --from=builder /app/client/package.json  ./client/package.json
+COPY --from=builder /app/e2e/package.json     ./e2e/package.json
+RUN npm ci
+
+# ビルド成果物
+COPY --from=builder /app/shared/dist  ./shared/dist/
+COPY --from=builder /app/server/dist  ./server/dist/
+COPY --from=builder /app/client/dist  ./client/dist/
+
+# E2Eテストファイル
+COPY --from=builder /app/e2e/playwright.config.ts ./e2e/
+COPY --from=builder /app/e2e/tests/               ./e2e/tests/
+COPY --from=builder /app/e2e/tsconfig.json        ./e2e/
+
+# E2E専用データディレクトリ (テスト実行ごとに /test/reset でリセット)
+RUN mkdir -p /app/e2e/.e2e-data
+
+# CI=true により playwright.config.ts の reuseExistingServer が false になる
+# (webServerが毎回新しくサーバーを起動する)
+ENV CI=true
+ENV NODE_ENV=production
+ENV PORT=4000
+ENV MODELER_DATA_DIR=/app/e2e/.e2e-data
+ENV CLIENT_DIST_DIR=/app/client/dist
+# Playwright公式イメージはブラウザを /ms-playwright に配置している
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+CMD ["npx", "--workspace=e2e", "playwright", "test", "--project=chromium"]
