@@ -4,10 +4,12 @@ import type {
   FieldType,
   ModelDefinition,
   ModelDefinitionDocument,
+  ParentRelation,
   RelationKind,
   ReferentialAction,
+  ScreenLayout,
 } from './model.js';
-import { RELATION_KINDS, REFERENTIAL_ACTIONS } from './model.js';
+import { RELATION_KINDS, REFERENTIAL_ACTIONS, SCREEN_LAYOUTS } from './model.js';
 
 /**
  * バリデーション関数群。
@@ -223,6 +225,61 @@ export function validateModelDefinition(model: unknown, path: string): string[] 
   if (m.ui !== undefined) {
     errors.push(...validateUiConfig(m.ui, `${path}.ui`));
   }
+
+  // 親子関係 (parent) の単一モデル内整合性チェック。クロスモデル整合性は後段で実施。
+  if (m.parent !== undefined) {
+    errors.push(...validateParentRelation(m.parent, m, `${path}.parent`));
+  }
+  return errors;
+}
+
+/**
+ * ModelDefinition.parent (親子関係宣言) の単一モデル内チェック。
+ *
+ * - parent.model / parent.via が両方文字列で空でないこと
+ * - parent.via が自モデル内の field 名であり、その field の type が 'reference' であること
+ * - その reference の targetModel が parent.model と一致すること
+ *
+ * 「親モデル自体が実在するか」「親モデル自身が parent を持たないか (多段親禁止)」は
+ * クロスモデルチェック (validateCrossModelReferences) 側で実施する。
+ */
+function validateParentRelation(
+  parent: unknown,
+  model: Partial<ModelDefinition>,
+  path: string,
+): string[] {
+  const errors: string[] = [];
+  if (typeof parent !== 'object' || parent === null) {
+    return [`${path}: must be an object`];
+  }
+  const p = parent as Partial<ParentRelation>;
+  if (typeof p.model !== 'string' || p.model.trim() === '') {
+    errors.push(`${path}.model: must be non-empty string`);
+  }
+  if (typeof p.via !== 'string' || p.via.trim() === '') {
+    errors.push(`${path}.via: must be non-empty string`);
+  }
+  if (errors.length > 0) return errors;
+
+  // via で指定された field が自モデルに存在するか
+  if (!Array.isArray(model.fields)) return errors;
+  const viaField = model.fields.find((f) => {
+    if (typeof f !== 'object' || f === null) return false;
+    return (f as Partial<FieldDefinition>).name === p.via;
+  }) as Partial<FieldDefinition> | undefined;
+  if (!viaField) {
+    errors.push(`${path}.via: "${p.via}" is not a field of this model`);
+    return errors;
+  }
+  if (viaField.type !== 'reference') {
+    errors.push(`${path}.via: field "${p.via}" must have type "reference"`);
+    return errors;
+  }
+  if (typeof viaField.targetModel === 'string' && viaField.targetModel !== p.model) {
+    errors.push(
+      `${path}.model: "${p.model}" must match field "${p.via}".targetModel ("${viaField.targetModel}")`,
+    );
+  }
   return errors;
 }
 
@@ -313,7 +370,12 @@ function validateUiConfig(ui: unknown, path: string): string[] {
   if (typeof ui !== 'object' || ui === null) {
     return [`${path}: must be an object`];
   }
-  const u = ui as { buttons?: unknown; builtinButtonOverrides?: unknown };
+  const u = ui as { buttons?: unknown; builtinButtonOverrides?: unknown; layout?: unknown };
+  if (u.layout !== undefined) {
+    if (typeof u.layout !== 'string' || !SCREEN_LAYOUTS.includes(u.layout as ScreenLayout)) {
+      errors.push(`${path}.layout: must be one of ${SCREEN_LAYOUTS.join(', ')}`);
+    }
+  }
   if (u.buttons !== undefined) {
     if (!Array.isArray(u.buttons)) {
       errors.push(`${path}.buttons: must be array`);
@@ -425,6 +487,34 @@ function validateCrossModelReferences(models: unknown[]): string[] {
         }
       }
     });
+  });
+
+  // 親子関係 (parent) のクロスモデルチェック。
+  // 親モデルが実在し、かつ親モデル自身が parent を持たない (= 多段親禁止) ことを確認。
+  const modelsByName = new Map<string, Partial<ModelDefinition>>();
+  for (const m of models) {
+    if (typeof m !== 'object' || m === null) continue;
+    const mm = m as Partial<ModelDefinition>;
+    if (typeof mm.name === 'string') modelsByName.set(mm.name, mm);
+  }
+  models.forEach((m, mi) => {
+    if (typeof m !== 'object' || m === null) return;
+    const mm = m as Partial<ModelDefinition>;
+    if (!mm.parent) return;
+    const path = `document.models[${mi}].parent`;
+    const parentModelName = (mm.parent as Partial<ParentRelation>).model;
+    if (typeof parentModelName !== 'string') return; // フィールド単位で既にエラー済
+    const parentModel = modelsByName.get(parentModelName);
+    if (!parentModel) {
+      errors.push(`${path}.model: "${parentModelName}" does not match any model in document`);
+      return;
+    }
+    // v1 では多段親 (親自身が parent を持つ) を禁止する
+    if (parentModel.parent) {
+      errors.push(
+        `${path}.model: "${parentModelName}" is itself a child model; nested master-detail is not supported`,
+      );
+    }
   });
 
   return errors;

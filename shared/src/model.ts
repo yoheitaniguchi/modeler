@@ -50,6 +50,31 @@ export const DEFAULT_RELATION_KIND: RelationKind = 'oneToMany';
 export const DEFAULT_ON_DELETE: ReferentialAction = 'restrict';
 export const DEFAULT_ON_UPDATE: ReferentialAction = 'noAction';
 
+/**
+ * 画面レイアウトの種類。
+ * standard = 従来の単一テーブル + モーダル CRUD 画面 (後方互換のデフォルト)
+ * masterDetail = 上下分割の親子(ヘッダー/明細)画面
+ */
+export type ScreenLayout = 'standard' | 'masterDetail';
+export const SCREEN_LAYOUTS: readonly ScreenLayout[] = ['standard', 'masterDetail'];
+export const DEFAULT_SCREEN_LAYOUT: ScreenLayout = 'standard';
+
+/**
+ * ヘッダー・明細の親子関係宣言。明細(子)モデル側に置く。
+ *
+ * 例: orderLines (明細) に `parent: { model: 'orders', via: 'order' }` を置くと
+ *   「自分は orders の明細であり、order フィールド (reference→orders) が親を指す」と読める。
+ *
+ * 内部実装としては `via` で指定された reference フィールドをそのまま流用する。
+ * parent は「この reference が所有関係であることを宣言するマーカー」に近い。
+ */
+export interface ParentRelation {
+  /** 親 (ヘッダー) モデル名。 */
+  model: string;
+  /** 自モデル内で親を指す reference フィールド名。 */
+  via: string;
+}
+
 /** 1 つのフィールド (テーブルでいうカラム相当) の定義。 */
 export interface FieldDefinition {
   /** プログラム上の識別子。英数とアンダースコアのみ (バリデーションで強制)。 */
@@ -125,6 +150,13 @@ export interface BuiltinButtonOverride {
 
 /** モデル単位での UI 設定。 */
 export interface ModelUiConfig {
+  /**
+   * 画面レイアウト。
+   * 未指定または 'standard' = 従来の単一CRUD画面 (後方互換)
+   * 'masterDetail' = 上下分割の親子(ヘッダー/明細)画面。
+   * 該当モデルを `parent.model` で指す子モデルが 1 つ以上必要。
+   */
+  layout?: ScreenLayout;
   /** 一覧画面のタイトル。未設定ならモデル.label を使う。 */
   listTitle?: string;
   /** 詳細/編集画面のタイトル。 */
@@ -157,6 +189,11 @@ export interface ModelDefinition {
   fields: FieldDefinition[];
   /** モデル単位での UI 設定。 */
   ui?: ModelUiConfig;
+  /**
+   * このモデルが他モデルの「明細」である場合の親子関係宣言。
+   * 未指定なら独立モデル (従来通り)。
+   */
+  parent?: ParentRelation;
   /** 論理削除を有効にするか。true の場合削除時に _deleted フラグを立てる。 */
   softDelete?: boolean;
   /**

@@ -4,6 +4,7 @@ import type {
   FieldType,
   ModelDefinition,
   ModelUiConfig,
+  ParentRelation,
   RelationKind,
   ReferentialAction,
 } from '@modeler/shared';
@@ -614,6 +615,13 @@ export function ModelEditor({
         </button>
 
         <div style={{ marginTop: '0.8rem' }}>
+          <ParentRelationEditor
+            model={model}
+            knownModelNames={knownModelNames}
+            onChange={(parent) => onChange({ ...model, parent })}
+          />
+        </div>
+        <div style={{ marginTop: '0.4rem' }}>
           <UiConfigEditor ui={model.ui} onChange={setUi} />
         </div>
         <div style={{ marginTop: '0.4rem' }}>
@@ -637,6 +645,95 @@ function labelError(label: string): string | null {
   if (label === '') return null;
   if (label.trim() === '') return 'ラベルは空白だけにできません';
   return null;
+}
+
+/**
+ * 親子関係 (parent) 編集用サブコンポーネント。
+ * 「このモデルは別モデルの明細ですか?」のトグル → ON 時にだけ
+ * parent.model / parent.via の選択肢を出す。via は自モデルの reference フィールドから選ぶ。
+ */
+function ParentRelationEditor({
+  model,
+  knownModelNames,
+  onChange,
+}: {
+  model: ModelDefinition;
+  knownModelNames?: string[];
+  onChange: (parent: ParentRelation | undefined) => void;
+}) {
+  const enabled = !!model.parent;
+  const refFields = model.fields.filter((f) => f.type === 'reference');
+  const currentParent: ParentRelation = model.parent ?? { model: '', via: '' };
+
+  return (
+    <details data-testid="parent-relation-editor" open={enabled}>
+      <summary><strong>親モデル設定 (このモデルは別モデルの明細?)</strong></summary>
+      <div className="row" style={{ marginTop: '0.5rem', flexWrap: 'wrap', gap: '0.8rem' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <input
+            type="checkbox"
+            data-testid="parent-enable"
+            checked={enabled}
+            onChange={(e) => {
+              if (e.target.checked) {
+                onChange({ model: '', via: '' });
+              } else {
+                onChange(undefined);
+              }
+            }}
+          />
+          このモデルは別モデルの明細(子)である
+        </label>
+        {enabled && (
+          <>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              親モデル
+              {knownModelNames && knownModelNames.length > 0 ? (
+                <select
+                  data-testid="parent-model"
+                  value={currentParent.model}
+                  onChange={(e) => onChange({ ...currentParent, model: e.target.value })}
+                >
+                  <option value="">-- 選択 --</option>
+                  {knownModelNames
+                    .filter((n) => n !== model.name)
+                    .map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  data-testid="parent-model"
+                  value={currentParent.model}
+                  onChange={(e) => onChange({ ...currentParent, model: e.target.value })}
+                  placeholder="orders"
+                />
+              )}
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              親への参照フィールド (via)
+              <select
+                data-testid="parent-via"
+                value={currentParent.via}
+                onChange={(e) => onChange({ ...currentParent, via: e.target.value })}
+              >
+                <option value="">-- 選択 --</option>
+                {refFields.map((f) => (
+                  <option key={f.name} value={f.name}>{f.name} (→ {f.targetModel || '?'})</option>
+                ))}
+              </select>
+            </label>
+            {refFields.length === 0 && (
+              <span className="inline-error" style={{ fontSize: '0.85em' }}>
+                先に親モデルを参照する reference フィールドを追加してください。
+              </span>
+            )}
+          </>
+        )}
+      </div>
+    </details>
+  );
 }
 
 /** フィールド名の即時検証。重複もここで検出する。 */

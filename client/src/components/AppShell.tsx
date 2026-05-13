@@ -9,6 +9,7 @@ import { loadMode, saveMode, type UiMode } from '../services/uiPrefs.js';
 import { Sidebar } from './Sidebar.js';
 import { ModelDesignerView } from '../views/ModelDesignerView.js';
 import { CrudView } from '../views/CrudView.js';
+import { MasterDetailView } from '../views/MasterDetailView.js';
 import { InlineModelEditor } from './InlineModelEditor.js';
 import { ConfirmDialog } from './ConfirmDialog.js';
 
@@ -196,7 +197,11 @@ export function AppShell({ api }: { api: ApiClient }) {
                           />
                         )}
   
-                        {!deployedEditing && <CrudView api={api} model={selected} />}
+                        {!deployedEditing && (
+                          selected.ui?.layout === 'masterDetail'
+                            ? <MasterDetailView api={api} headerModel={selected} allModels={deployedModels} />
+                            : <CrudView api={api} model={selected} />
+                        )}
   
                         <ConfirmDialog
                           open={deployedDeleteConfirm !== null}

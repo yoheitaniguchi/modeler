@@ -620,3 +620,166 @@ describe('primaryKey, id type, and display settings validation', () => {
     expect(resOk.ok).toBe(true);
   });
 });
+
+describe('validateDocument: parent / layout (master-detail)', () => {
+  const ordersHeader: ModelDefinition = {
+    name: 'orders',
+    label: '受注',
+    fields: [
+      { name: 'id', label: 'ID', type: 'id', required: true, primaryKey: true },
+      { name: 'customer', label: '顧客', type: 'string', required: true },
+    ],
+    ui: { layout: 'masterDetail' },
+  };
+  const orderLinesDetail: ModelDefinition = {
+    name: 'orderLines',
+    label: '受注明細',
+    fields: [
+      { name: 'id', label: 'ID', type: 'id', required: true, primaryKey: true },
+      {
+        name: 'order',
+        label: '受注',
+        type: 'reference',
+        required: true,
+        targetModel: 'orders',
+        onDelete: 'cascade',
+      },
+      { name: 'product', label: '商品', type: 'string', required: true },
+    ],
+    parent: { model: 'orders', via: 'order' },
+  };
+
+  it('正しい masterDetail ドキュメントを受け入れる', () => {
+    const doc: ModelDefinitionDocument = {
+      version: 1,
+      models: [ordersHeader, orderLinesDetail],
+    };
+    expect(validateDocument(doc)).toEqual({ ok: true });
+  });
+
+  it('parent.via が存在しないフィールドを指すと弾く', () => {
+    const bad: ModelDefinitionDocument = {
+      version: 1,
+      models: [
+        ordersHeader,
+        { ...orderLinesDetail, parent: { model: 'orders', via: 'nonexistent' } },
+      ],
+    };
+    const res = validateDocument(bad);
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.errors.some((e) => e.includes('parent.via') && e.includes('nonexistent'))).toBe(
+        true,
+      );
+    }
+  });
+
+  it('parent.via が reference 型でないと弾く', () => {
+    const bad: ModelDefinitionDocument = {
+      version: 1,
+      models: [
+        ordersHeader,
+        { ...orderLinesDetail, parent: { model: 'orders', via: 'product' } },
+      ],
+    };
+    const res = validateDocument(bad);
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.errors.some((e) => e.includes('must have type "reference"'))).toBe(true);
+    }
+  });
+
+  it('parent.model と field.targetModel の不一致を弾く', () => {
+    const bad: ModelDefinitionDocument = {
+      version: 1,
+      models: [
+        ordersHeader,
+        {
+          ...orderLinesDetail,
+          parent: { model: 'somethingElse', via: 'order' },
+        },
+      ],
+    };
+    const res = validateDocument(bad);
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.errors.some((e) => e.includes('parent.model'))).toBe(true);
+    }
+  });
+
+  it('実在しない親モデルを弾く (クロスモデル)', () => {
+    const bad: ModelDefinitionDocument = {
+      version: 1,
+      models: [
+        {
+          ...orderLinesDetail,
+          fields: orderLinesDetail.fields.map((f) =>
+            f.name === 'order' ? { ...f, targetModel: 'ghost' } : f,
+          ),
+          parent: { model: 'ghost', via: 'order' },
+        },
+      ],
+    };
+    const res = validateDocument(bad);
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      // 親モデルがそもそも存在しないので targetModel 解決失敗 + parent.model 解決失敗 の両方が出る想定
+      expect(res.errors.some((e) => e.includes('does not match any model'))).toBe(true);
+    }
+  });
+
+  it('多段親 (親自身が parent を持つ) を弾く', () => {
+    const grand: ModelDefinition = {
+      name: 'grandParent',
+      label: '大親',
+      fields: [{ name: 'id', label: 'ID', type: 'id', required: true, primaryKey: true }],
+    };
+    const middle: ModelDefinition = {
+      name: 'orders',
+      label: '受注',
+      fields: [
+        { name: 'id', label: 'ID', type: 'id', required: true, primaryKey: true },
+        {
+          name: 'gp',
+          label: '大親',
+          type: 'reference',
+          required: true,
+          targetModel: 'grandParent',
+        },
+      ],
+      parent: { model: 'grandParent', via: 'gp' },
+    };
+    const bad: ModelDefinitionDocument = {
+      version: 1,
+      models: [grand, middle, orderLinesDetail],
+    };
+    const res = validateDocument(bad);
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.errors.some((e) => e.includes('nested master-detail is not supported'))).toBe(
+        true,
+      );
+    }
+  });
+
+  it('ui.layout に不正な値を弾く', () => {
+    const bad = {
+      version: 1,
+      models: [
+        {
+          ...ordersHeader,
+          ui: { layout: 'something' },
+        },
+      ],
+    };
+    const res = validateDocument(bad as unknown as ModelDefinitionDocument);
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.errors.some((e) => e.includes('ui.layout'))).toBe(true);
+    }
+  });
+
+  it('parent / layout 未指定の従来ドキュメントを受け入れる (後方互換)', () => {
+    expect(validateDocument(validDoc)).toEqual({ ok: true });
+  });
+});
