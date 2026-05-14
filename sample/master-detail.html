@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>マスター・ディテール画面サンプル — Modeler</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="./master-detail.css" />
+</head>
+<body>
+  <header class="top">
+    <h1>Modeler — マスタメンテナンス開発ツール <span class="version">v0.1 (sample)</span></h1>
+    <div class="layout-switch">
+      <span class="muted">画面パターン:</span>
+      <label><input type="radio" name="layout" value="standard" /> standard (従来)</label>
+      <label><input type="radio" name="layout" value="masterDetail" checked /> masterDetail (新規)</label>
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <!-- ========== 上半分: ヘッダー ========== -->
+    <section class="pane master-pane" aria-label="ヘッダー">
+      <div class="pane-header">
+        <h2>受注ヘッダー <span class="muted">(orders)</span></h2>
+        <div class="pane-actions">
+          <button class="primary" id="header-create">＋ 新規ヘッダー</button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table" id="header-table">
+          <thead>
+            <tr>
+              <th class="col-select"></th>
+              <th>受注ID</th>
+              <th>顧客</th>
+              <th>受注日</th>
+              <th>合計金額</th>
+            </tr>
+          </thead>
+          <tbody id="header-tbody">
+            <!-- JS で生成 -->
+          </tbody>
+        </table>
+      </div>
+
+      <details class="header-detail" open>
+        <summary>選択中ヘッダーの詳細</summary>
+        <div class="header-form" id="header-form">
+          <!-- JS で選択中ヘッダーのフォームを描画 -->
+        </div>
+      </details>
+    </section>
+
+    <div class="splitter" aria-hidden="true"></div>
+
+    <!-- ========== 下半分: 明細 ========== -->
+    <section class="pane detail-pane" aria-label="明細">
+      <div class="pane-header">
+        <h2>明細 <span class="muted">(orderLines)</span></h2>
+        <div class="pane-actions">
+          <button class="ghost" id="line-add">＋ 行追加</button>
+          <button class="ghost" id="line-copy-from-existing">既存から…</button>
+          <button class="primary" id="line-save">明細を保存</button>
+        </div>
+      </div>
+
+      <div class="table-wrap" id="line-grid-wrap">
+        <table class="data-table editable" id="line-table">
+          <thead>
+            <tr>
+              <th class="col-no">行</th>
+              <th>商品 (reference)</th>
+              <th>数量</th>
+              <th>単価</th>
+              <th>小計</th>
+              <th class="col-actions"></th>
+            </tr>
+          </thead>
+          <tbody id="line-tbody">
+            <!-- JS で生成 -->
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="4" class="text-right">合計</td>
+              <td id="line-total">0</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="empty-state" id="empty-state" hidden>
+        ← 上のヘッダー一覧からヘッダーを選択してください
+      </div>
+    </section>
+  </main>
+
+  <!-- 「既存から」モーダル -->
+  <div class="modal-backdrop" id="copy-modal" hidden>
+    <div class="modal" role="dialog" aria-labelledby="copy-modal-title">
+      <div class="modal-header">
+        <h3 id="copy-modal-title">既存の明細レコードからコピー</h3>
+        <button class="close" aria-label="閉じる" id="copy-close">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="muted">過去のヘッダーに紐づく明細から、新規行にコピーしたい行を選択してください。</p>
+        <label class="search-row">
+          検索: <input type="text" id="copy-search" placeholder="商品名で絞り込み..." />
+        </label>
+        <table class="data-table copy-list">
+          <thead>
+            <tr>
+              <th></th>
+              <th>由来ヘッダー</th>
+              <th>商品</th>
+              <th>数量</th>
+              <th>単価</th>
+            </tr>
+          </thead>
+          <tbody id="copy-tbody"></tbody>
+        </table>
+      </div>
+      <div class="modal-footer">
+        <button class="ghost" id="copy-cancel">キャンセル</button>
+        <button class="primary" id="copy-apply">選択した行をコピー</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- reference 入力用ポップオーバー (検索可能ドロップダウン) -->
+  <div class="ref-popover" id="ref-popover" hidden>
+    <input type="text" id="ref-search" placeholder="商品を検索..." />
+    <ul id="ref-options"></ul>
+  </div>
+
+  <footer class="foot">
+    <span class="muted">これは <code>sample/master-detail.html</code> の静的画面サンプルです。データはブラウザ内のダミーで動作確認用です。</span>
+  </footer>
+
+  <script src="./master-detail.js"></script>
+</body>
+</html>

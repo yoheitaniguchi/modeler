@@ -3,6 +3,7 @@ import type { ModelDefinition } from '@modeler/shared';
 import type { ApiClient } from '../services/api.js';
 import { ApiError } from '../services/api.js';
 import { CrudView } from './CrudView.js';
+import { MasterDetailView } from './MasterDetailView.js';
 import { InlineModelEditor } from '../components/InlineModelEditor.js';
 import { ConfirmDialog } from '../components/ConfirmDialog.js';
 
@@ -109,7 +110,11 @@ export function DeployedModelsView({ api }: { api: ApiClient }) {
         />
       )}
 
-      {current && !editing && <CrudView api={api} model={current} />}
+      {current && !editing && (
+        current.ui?.layout === 'masterDetail'
+          ? <MasterDetailView api={api} headerModel={current} allModels={models} />
+          : <CrudView api={api} model={current} />
+      )}
 
       <ConfirmDialog
         open={deleteConfirm !== null}

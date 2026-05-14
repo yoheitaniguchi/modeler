@@ -1,4 +1,5 @@
-import type { ModelUiConfig } from '@modeler/shared';
+import type { ModelUiConfig, ScreenLayout } from '@modeler/shared';
+import { SCREEN_LAYOUTS } from '@modeler/shared';
 
 /**
  * 画面定義 (タイトル/ボタンラベル/既存ボタンの URL 上書き) を編集する。
@@ -36,8 +37,39 @@ export function UiConfigEditor({
     });
   };
 
+  const LAYOUT_LABELS: Record<ScreenLayout, string> = {
+    standard: 'standard — 単一CRUD (従来)',
+    masterDetail: 'masterDetail — 上下分割 ヘッダー/明細',
+  };
+
   return (
     <div className="ui-config-editor" data-testid="ui-config-editor">
+      <details open>
+        <summary><strong>画面パターン (レイアウト)</strong></summary>
+        <div className="row" style={{ marginTop: '0.5rem' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            画面パターン
+            <select
+              data-testid="layout-select"
+              value={u.layout ?? 'standard'}
+              onChange={(e) => {
+                const v = e.target.value as ScreenLayout;
+                update({ layout: v === 'standard' ? undefined : v });
+              }}
+            >
+              {SCREEN_LAYOUTS.map((l) => (
+                <option key={l} value={l}>{LAYOUT_LABELS[l]}</option>
+              ))}
+            </select>
+          </label>
+          {u.layout === 'masterDetail' && (
+            <span className="muted" style={{ fontSize: '0.85em' }}>
+              このモデルを <code>parent.model</code> で指す子モデルが 1 つ以上必要です。
+            </span>
+          )}
+        </div>
+      </details>
+
       <details>
         <summary><strong>画面設定 (タイトル・ボタンラベル)</strong></summary>
         <div className="row" style={{ marginTop: '0.5rem' }}>
