@@ -155,13 +155,13 @@ export class JsonFileDao {
 
       if (this.model.softDelete) {
         if (all[idx]._deleted) return false; // Already deleted
-        const updatedRecord = { ...all[idx], _deleted: true };
+        const updatedRecord: Record<string, unknown> = { ...all[idx], _deleted: true };
         for (const f of this.model.fields) {
           if (f.type === 'date' && f.defaultOnUpdate) {
             updatedRecord[f.name] = getTodayString();
           }
         }
-        all[idx] = updatedRecord;
+        all[idx] = updatedRecord as ModelRecord;
         await this.persist(all);
         return true;
       } else {
