@@ -156,60 +156,62 @@ export function AppShell({ api }: { api: ApiClient }) {
         />
 
         <main className="main-pane">
-          {mode === 'admin' && (
-            <ModelDesignerView
-              vm={vm}
-              onSaveJson={onSave}
-              onLoadJson={onLoadClick}
-            />
-          )}
-          {mode === 'user' && (
-            <>
-              {deployedLoading && <p className="muted">読み込み中…</p>}
-              {!deployedLoading && (!deployedModels || deployedModels.length === 0) && (
-                <p className="muted">
-                  デプロイされたモデルがありません。
-                  <br />
-                  左側のメニューから管理者モードへ切り替えて、モデルを作成・デプロイしてください。
-                </p>
-              )}
-              {!deployedLoading && deployedModels && deployedSelectedName && (
-                (() => {
-                  const selected = deployedModels.find((m) => m.name === deployedSelectedName);
-                  if (!selected) return null;
-                  return (
-                    <>
-
-
-                      {deployedEditing && (
-                        <InlineModelEditor
-                          initial={selected}
-                          onSave={onSaveEditDeployed}
-                          onCancel={() => {
-                            setDeployedEditing(false);
-                            setDeployedEditErrors([]);
-                          }}
-                          saving={deployedSaving}
-                          errors={deployedEditErrors}
-                          knownModelNames={deployedModels.map((m) => m.name)}
+          <div className="display-area">
+            {mode === 'admin' && (
+              <ModelDesignerView
+                vm={vm}
+                onSaveJson={onSave}
+                onLoadJson={onLoadClick}
+              />
+            )}
+            {mode === 'user' && (
+              <>
+                {deployedLoading && <p className="muted">読み込み中…</p>}
+                {!deployedLoading && (!deployedModels || deployedModels.length === 0) && (
+                  <p className="muted">
+                    デプロイされたモデルがありません。
+                    <br />
+                    左側のメニューから管理者モードへ切り替えて、モデルを作成・デプロイしてください。
+                  </p>
+                )}
+                {!deployedLoading && deployedModels && deployedSelectedName && (
+                  (() => {
+                    const selected = deployedModels.find((m) => m.name === deployedSelectedName);
+                    if (!selected) return null;
+                    return (
+                      <>
+  
+  
+                        {deployedEditing && (
+                          <InlineModelEditor
+                            initial={selected}
+                            onSave={onSaveEditDeployed}
+                            onCancel={() => {
+                              setDeployedEditing(false);
+                              setDeployedEditErrors([]);
+                            }}
+                            saving={deployedSaving}
+                            errors={deployedEditErrors}
+                            knownModelNames={deployedModels.map((m) => m.name)}
+                          />
+                        )}
+  
+                        {!deployedEditing && <CrudView api={api} model={selected} />}
+  
+                        <ConfirmDialog
+                          open={deployedDeleteConfirm !== null}
+                          message={`モデル「${deployedDeleteConfirm}」を削除します。\nAPI エンドポイントは即時無効化されます (データファイルは残ります)。`}
+                          okLabel="削除"
+                          onOk={onConfirmDeleteDeployed}
+                          onCancel={() => setDeployedDeleteConfirm(null)}
                         />
-                      )}
-
-                      {!deployedEditing && <CrudView api={api} model={selected} />}
-
-                      <ConfirmDialog
-                        open={deployedDeleteConfirm !== null}
-                        message={`モデル「${deployedDeleteConfirm}」を削除します。\nAPI エンドポイントは即時無効化されます (データファイルは残ります)。`}
-                        okLabel="削除"
-                        onOk={onConfirmDeleteDeployed}
-                        onCancel={() => setDeployedDeleteConfirm(null)}
-                      />
-                    </>
-                  );
-                })()
-              )}
-            </>
-          )}
+                      </>
+                    );
+                  })()
+                )}
+              </>
+            )}
+          </div>
         </main>
       </div>
 
