@@ -5,6 +5,14 @@ import type { ModelDefinition, Record as ModelRecord, ReferentialAction } from '
 import { validateRecord, formatRecord, DEFAULT_ON_DELETE } from '@modeler/shared';
 import type { DaoRegistry } from './daoRegistry.js';
 
+function getTodayString(): string {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 /**
  * DAO (Data Access Object) — データの読み書きをカプセル化する層。
  *
@@ -74,7 +82,18 @@ export class JsonFileDao {
   }
 
   async create(input: Record<string, unknown>): Promise<ModelRecord> {
-    const withIds = await this.generateIdFields(input);
+    const withDefaults = { ...input };
+    for (const f of this.model.fields) {
+      if (f.type === 'date') {
+        const val = withDefaults[f.name];
+        if (val === undefined || val === null || val === '') {
+          if (f.defaultValue === 'today') {
+            withDefaults[f.name] = getTodayString();
+          }
+        }
+      }
+    }
+    const withIds = await this.generateIdFields(withDefaults);
     const formatted = formatRecord(this.model, withIds);
     const validation = validateRecord(this.model, formatted);
     if (!validation.ok) {
@@ -92,7 +111,13 @@ export class JsonFileDao {
   }
 
   async update(id: string, input: Record<string, unknown>): Promise<ModelRecord | null> {
-    const formatted = formatRecord(this.model, input);
+    const withUpdateDefaults = { ...input };
+    for (const f of this.model.fields) {
+      if (f.type === 'date' && f.defaultOnUpdate) {
+        withUpdateDefaults[f.name] = getTodayString();
+      }
+    }
+    const formatted = formatRecord(this.model, withUpdateDefaults);
     const validation = validateRecord(this.model, formatted);
     if (!validation.ok) {
       throw new DaoValidationError(validation.errors);
@@ -130,7 +155,13 @@ export class JsonFileDao {
 
       if (this.model.softDelete) {
         if (all[idx]._deleted) return false; // Already deleted
-        all[idx] = { ...all[idx], _deleted: true };
+        const updatedRecord = { ...all[idx], _deleted: true };
+        for (const f of this.model.fields) {
+          if (f.type === 'date' && f.defaultOnUpdate) {
+            updatedRecord[f.name] = getTodayString();
+          }
+        }
+        all[idx] = updatedRecord;
         await this.persist(all);
         return true;
       } else {

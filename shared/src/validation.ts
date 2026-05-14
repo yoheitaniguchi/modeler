@@ -79,6 +79,14 @@ export function validateFieldDefinition(field: unknown, path: string): string[] 
     if (err) errors.push(`${path}.defaultValue: ${err}`);
   }
 
+  if (f.defaultOnUpdate !== undefined) {
+    if (typeof f.defaultOnUpdate !== 'boolean') {
+      errors.push(`${path}.defaultOnUpdate: must be boolean`);
+    } else if (f.type !== 'date') {
+      errors.push(`${path}.defaultOnUpdate: only valid when type is "date"`);
+    }
+  }
+
   // optionsUrl が指定されていれば、type==='string' のみ許可
   if (f.optionsUrl !== undefined) {
     if (typeof f.optionsUrl !== 'string' || f.optionsUrl.trim() === '') {

@@ -65,15 +65,20 @@ export function FieldInput({
           onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))}
         />
       );
-    case 'date':
+    case 'date': {
+      const isAutoDate = field.defaultValue === 'today' || field.defaultOnUpdate === true;
       return (
         <input
           type="date"
           {...common}
           value={(value as string) ?? ''}
           onChange={(e) => onChange(e.target.value)}
+          disabled={isAutoDate}
+          style={isAutoDate ? { backgroundColor: '#f3f4f6', cursor: 'not-allowed' } : undefined}
+          title={isAutoDate ? '自動設定される日付のため編集できません' : undefined}
         />
       );
+    }
     case 'boolean':
       return (
         <label>
