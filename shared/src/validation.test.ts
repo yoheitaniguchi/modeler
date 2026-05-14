@@ -104,6 +104,42 @@ describe('validateDocument', () => {
     expect(validateDocument(goodDefault)).toEqual({ ok: true });
   });
 
+  it('defaultOnUpdate が date フィールドに boolean で指定されれば OK', () => {
+    const doc: ModelDefinitionDocument = {
+      version: 1,
+      models: [
+        {
+          name: 'record',
+          label: '記録',
+          fields: [
+            { name: 'update_time', label: '更新日時', type: 'date', required: false, defaultOnUpdate: true },
+          ],
+        },
+      ],
+    };
+    expect(validateDocument(doc)).toEqual({ ok: true });
+  });
+
+  it('defaultOnUpdate が date 以外のフィールドに指定されると失敗', () => {
+    const doc: ModelDefinitionDocument = {
+      version: 1,
+      models: [
+        {
+          name: 'record',
+          label: '記録',
+          fields: [
+            { name: 'title', label: 'タイトル', type: 'string', required: false, defaultOnUpdate: true } as never,
+          ],
+        },
+      ],
+    };
+    const result = validateDocument(doc);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.some((e) => e.includes('defaultOnUpdate'))).toBe(true);
+    }
+  });
+
   it('optionsUrl が有効な URL 文字列なら OK', () => {
     const withOptions: ModelDefinitionDocument = {
       version: 1,

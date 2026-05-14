@@ -209,6 +209,69 @@ describe('JsonFileDao', () => {
     expect(uid.length).toBeGreaterThan(10); // UUIDの妥当な長さ
     expect(created['name']).toBe('山田太郎');
   });
+
+  it('登録時に defaultValue="today" であれば今日の日付が設定される', async () => {
+    const todayDao = new JsonFileDao({
+      ...model,
+      name: 'today-create-test',
+      fields: [
+        { name: 'name', label: '名称', type: 'string', required: true },
+        { name: 'created_at', label: '登録日', type: 'date', required: false, defaultValue: 'today' },
+      ],
+    }, dataDir);
+    await todayDao.init();
+    const created = await todayDao.create({ name: 'バナナ' });
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    expect(created.created_at).toBe(`${yyyy}-${mm}-${dd}`);
+  });
+
+  it('更新時に defaultOnUpdate=true であれば今日の日付で更新される', async () => {
+    const updateDao = new JsonFileDao({
+      ...model,
+      name: 'update-date-test',
+      fields: [
+        { name: 'name', label: '名称', type: 'string', required: true },
+        { name: 'updated_at', label: '更新日', type: 'date', required: false, defaultOnUpdate: true },
+      ],
+    }, dataDir);
+    await updateDao.init();
+    const created = await updateDao.create({ name: 'リンぎョ', updated_at: '2020-01-01' });
+    expect(created.updated_at).toBe('2020-01-01');
+
+    const updated = await updateDao.update(created.id, { name: 'リンゴ改', updated_at: '2020-01-01' });
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    expect(updated?.updated_at).toBe(`${yyyy}-${mm}-${dd}`);
+  });
+
+  it('論理削除時に defaultOnUpdate=true であれば今日の日付で更新される', async () => {
+    const deleteDao = new JsonFileDao({
+      ...model,
+      name: 'delete-date-test',
+      softDelete: true,
+      fields: [
+        { name: 'name', label: '名称', type: 'string', required: true },
+        { name: 'deleted_at', label: '削除日', type: 'date', required: false, defaultOnUpdate: true },
+      ],
+    }, dataDir);
+    await deleteDao.init();
+    const created = await deleteDao.create({ name: 'メロン' });
+
+    expect(await deleteDao.remove(created.id)).toBe(true);
+
+    const raw = await fs.readFile(path.join(dataDir, 'delete-date-test.json'), 'utf-8');
+    const allRecords = JSON.parse(raw);
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    expect(allRecords[0].deleted_at).toBe(`${yyyy}-${mm}-${dd}`);
+  });
 });
 
 /**

@@ -93,6 +93,8 @@ export interface FieldDefinition {
   showInDetail?: boolean;
   /** デフォルト値。新規作成時にこの値で埋める。型に応じた値、または undefined/null で「値なし」。 */
   defaultValue?: unknown;
+  /** type='date' の場合、更新時（削除含む）に自動で今日の日付で更新するか。 */
+  defaultOnUpdate?: boolean;
   /** type='string' フィールドの場合、selectbox の選択肢を取得する API エンドポイント。 */
   optionsUrl?: string;
   /** type='id' の場合の自動採番 API エンドポイント。 */

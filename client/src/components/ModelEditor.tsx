@@ -365,6 +365,7 @@ export function ModelEditor({
                   <DefaultValueInput
                     field={field}
                     onChange={(v) => updateField(fi, { defaultValue: v })}
+                    onUpdateField={(patch) => updateField(fi, patch)}
                   />
                 </td>
                 <td>
@@ -752,9 +753,11 @@ function fieldNameError(
 function DefaultValueInput({
   field,
   onChange,
+  onUpdateField,
 }: {
-  field: { type: FieldType; defaultValue?: unknown };
+  field: { type: FieldType; defaultValue?: unknown; defaultOnUpdate?: boolean };
   onChange: (v: unknown) => void;
+  onUpdateField?: (patch: { defaultValue?: unknown; defaultOnUpdate?: boolean }) => void;
 }) {
   const value = field.defaultValue;
   const clear = () => onChange(undefined);
@@ -788,8 +791,9 @@ function DefaultValueInput({
       );
     case 'date': {
       const isToday = value === 'today';
+      const isDefaultOnUpdate = field.defaultOnUpdate ?? false;
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
           <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
             <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.2rem', whiteSpace: 'nowrap', cursor: 'pointer' }}>
               <input
@@ -803,9 +807,21 @@ function DefaultValueInput({
                   }
                 }}
               />
-              今日の日付にする
+              登録時に今日の日付にする
             </label>
             {value !== undefined && <button className="ghost" onClick={clear} style={{ padding: '0.1rem 0.3rem', fontSize: '0.75rem' }}>✕</button>}
+          </div>
+          <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+            <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.2rem', whiteSpace: 'nowrap', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={isDefaultOnUpdate}
+                onChange={(e) => {
+                  onUpdateField?.({ defaultOnUpdate: e.target.checked ? true : undefined });
+                }}
+              />
+              変更時（削除含む）に今日の日付にする
+            </label>
           </div>
           {!isToday && (
             <input
