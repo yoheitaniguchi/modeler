@@ -1,5 +1,6 @@
 import type { ModelerViewModel } from '../viewmodels/useModelerViewModel.js';
 import { ModelEditor } from '../components/ModelEditor.js';
+import { DestructiveDeployDialog } from '../components/DestructiveDeployDialog.js';
 
 /**
  * モデル設計 View — 管理者モードのメインペイン。
@@ -30,6 +31,13 @@ export function ModelDesignerView({
         </div>
       )}
       {vm.notice && <div className="notice">{vm.notice}</div>}
+      {vm.destructiveWarnings !== null && (
+        <DestructiveDeployDialog
+          warnings={vm.destructiveWarnings}
+          onConfirm={vm.confirmDestructiveDeploy}
+          onCancel={vm.cancelDestructiveDeploy}
+        />
+      )}
 
       {selected ? (
         <div className="card model-design-card">

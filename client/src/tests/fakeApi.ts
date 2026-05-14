@@ -25,7 +25,7 @@ export function createFakeApi(): ApiClient & { _store: Map<string, ModelRecord[]
       const idx = models.findIndex((m) => m.name === name);
       if (idx === -1) throw new Error('not found');
       models = models.map((m, i) => (i === idx ? model : m));
-      return model;
+      return { model, warnings: [] };
     },
     async deleteModel(name) {
       models = models.filter((m) => m.name !== name);

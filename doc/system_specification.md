@@ -35,12 +35,19 @@
   * **Services**: HTTP通信層（`api.ts`）、ファイルのJSON入出力機能（`jsonIo.ts`）。
 
 ### 3.3. サーバー層 (`server`)
-* **責務**: モデルのデプロイメント管理（メタAPI）および動的なCRUD REST APIを提供するExpressサーバー。データ永続化はJSONファイルで実装されています。
+* **責務**: モデルのデプロイメント管理（メタAPI）および動的なCRUD REST APIを提供するExpressサーバー。データ永続化は PostgreSQL で実装されています。
 * **主要コンポーネント**:
-  * `app.ts`: Expressアプリケーションの設定。ヘルスチェックおよびメタAPI（`/meta/deploy`, `/meta/models`）のルーティング。
-  * `deploy/registry.ts`: 動的なAPIルーティングの生成・管理。
+  * `app.ts`: Expressアプリケーションの設定。ヘルスチェックおよびメタAPI（`/meta/deploy`, `/meta/models`）のルーティング。`?force=true` で破壊的変更も適用。
+  * `deploy/registry.ts`: 動的なAPIルーティングの生成・管理。`POST /meta/deploy` / `PUT /meta/models/:name` のタイミングで PostgreSQL に `CREATE TABLE` / `ALTER TABLE` を発行する。破壊的変更を検出した場合は `DestructiveChangeError` を投げ、HTTP 409 + 警告メッセージで応答する。
+  * `db/schema.ts`: モデル定義から DDL を生成。`analyzeChanges` で新旧定義の差分と破壊性を判定。
+  * `db/pool.ts`: `pg.Pool` のシングルトン。`DATABASE_URL` を `dotenv` 経由で読み込む。
   * `routes/crudRouter.ts`: 動的に生成される、単一モデルに対するCRUDエンドポイント。
-  * `dao/jsonFileDao.ts`: Data Access Object。JSONファイルを利用した簡易的なデータの読み書きと直列化（排他制御）、バリデーションを担当。将来的なDBへの移行を容易にするためのカプセル化層。
+  * `dao/postgresDao.ts`: Data Access Object。PostgreSQL に対する SQL を用いた読み書き、トランザクション制御、FK 整合性チェック（restrict/cascade/setNull）、ユニーク/主キー検証を担当。
+
+### 環境セットアップ
+1. `cp .env.example .env` で `DATABASE_URL` / `TEST_DATABASE_URL` を設定する
+2. ローカル開発用に PostgreSQL を起動する場合は `docker compose -f docker-compose.dev.yml up -d`
+3. `npm install`、`npm run dev`
 
 ## 4. データモデル仕様
 

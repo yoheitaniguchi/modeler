@@ -19,3 +19,7 @@ server/data/
 
 # Local Claude config
 .claude/settings.*
+
+# Environment
+.env
+.env.local

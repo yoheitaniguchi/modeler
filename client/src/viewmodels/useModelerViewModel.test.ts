@@ -358,11 +358,11 @@ describe('useModelerViewModel', () => {
     act(() => result.current.updateModel(0, { name: 'customer', label: '顧客' }));
 
     act(() => result.current.duplicateModel(0));
-    
+
     expect(result.current.document.models).toHaveLength(2);
     expect(result.current.document.models[1].name).toBe('customer_copy');
     expect(result.current.document.models[1].label).toBe('顧客_copy');
-    
+
     const id2 = result.current.document.models[1].__clientId!;
     expect(result.current.selectedKey).toBe(id2);
 
@@ -370,5 +370,65 @@ describe('useModelerViewModel', () => {
     expect(result.current.document.models).toHaveLength(3);
     expect(result.current.document.models[1].name).toBe('customer_copy2');
     expect(result.current.document.models[1].label).toBe('顧客_copy2');
+  });
+
+  it('破壊的変更 (409) を受けると destructiveWarnings がセットされ、confirmDestructiveDeploy で再送できる', async () => {
+    const fakeApi = createFakeApi();
+    const calls: Array<{ force: boolean }> = [];
+    fakeApi.deploy = (async (_doc, opts) => {
+      const force = opts?.force === true;
+      calls.push({ force });
+      if (!force) {
+        const { ApiError } = await import('../services/api.js');
+        throw new ApiError(409, {
+          requiresConfirmation: true,
+          warnings: ['カラム "age" を削除します'],
+          changes: [{ kind: 'dropColumn', field: 'age', detail: 'カラム "age" を削除します' }],
+        });
+      }
+      return { deployed: [], warnings: [] };
+    }) as typeof fakeApi.deploy;
+
+    const { result } = renderHook(() => useModelerViewModel(fakeApi));
+    act(() => result.current.addModel());
+    act(() => result.current.updateModel(0, { name: 'customer', label: '顧客' }));
+    act(() => result.current.updateField(0, 0, { name: 'fullName', label: '氏名', type: 'string', required: true }));
+
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.deploy();
+    });
+    expect(ok).toBe(false);
+    expect(result.current.destructiveWarnings).toEqual(['カラム "age" を削除します']);
+
+    await act(async () => {
+      ok = await result.current.confirmDestructiveDeploy();
+    });
+    expect(ok).toBe(true);
+    expect(result.current.destructiveWarnings).toBeNull();
+    expect(calls).toEqual([{ force: false }, { force: true }]);
+  });
+
+  it('cancelDestructiveDeploy で警告状態がクリアされる', async () => {
+    const fakeApi = createFakeApi();
+    fakeApi.deploy = (async () => {
+      const { ApiError } = await import('../services/api.js');
+      throw new ApiError(409, {
+        requiresConfirmation: true,
+        warnings: ['x'],
+        changes: [],
+      });
+    }) as typeof fakeApi.deploy;
+
+    const { result } = renderHook(() => useModelerViewModel(fakeApi));
+    act(() => result.current.addModel());
+    act(() => result.current.updateModel(0, { name: 'a', label: 'A' }));
+    act(() => result.current.updateField(0, 0, { name: 'n', label: 'N' }));
+    await act(async () => {
+      await result.current.deploy();
+    });
+    expect(result.current.destructiveWarnings).toEqual(['x']);
+    act(() => result.current.cancelDestructiveDeploy());
+    expect(result.current.destructiveWarnings).toBeNull();
   });
 });
