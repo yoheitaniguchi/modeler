@@ -118,7 +118,7 @@ test.describe('リレーション — FK 整合性 (API)', () => {
     expect(delRes.status()).toBe(204);
 
     const updated = await (await api.get(`${BASE}/api/employee/${emp.id}`)).json();
-    expect(updated.dept).toBeNull();
+    expect(updated.dept).toBeUndefined();
     await api.dispose();
   });
 

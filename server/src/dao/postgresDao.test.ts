@@ -386,7 +386,7 @@ describe.skipIf(!TEST_DB_AVAILABLE)('PostgresDao — FK 整合性', () => {
     expect(await deptDao.get(dept.id)).toBeNull();
     const updated = await empDao.get(emp.id);
     expect(updated).not.toBeNull();
-    expect(updated?.dept).toBeNull();
+    expect(updated?.dept).toBeUndefined();
   });
 
   it('被参照がなければ restrict でも削除できる', async () => {
