@@ -1,0 +1,127 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.5 [39m[90m/home/yopey/modeler/server[39m
+
+ [31m❯[39m src/dao/postgresDao.test.ts [2m([22m[2m22 tests[22m[2m | [22m[31m22 failed[39m[2m)[22m[32m 31[2mms[22m[39m
+[31m     [31m×[31m init 直後の list は空[39m[32m 14[2mms[22m[39m
+[31m     [31m×[31m create + list で 1 件取れる[39m[32m 1[2mms[22m[39m
+[31m     [31m×[31m required を満たさないと DaoValidationError[39m[32m 1[2mms[22m[39m
+[31m     [31m×[31m update は id を保持したまま値を差し替える[39m[32m 1[2mms[22m[39m
+[31m     [31m×[31m 存在しない id の update は null[39m[32m 1[2mms[22m[39m
+[31m     [31m×[31m remove で消える / もう一度 remove は false[39m[32m 1[2mms[22m[39m
+[31m     [31m×[31m 並行 create が全件保存される[39m[32m 1[2mms[22m[39m
+[31m     [31m×[31m softDelete 有効時、remove は _deleted を立てる[39m[32m 1[2mms[22m[39m
+[31m     [31m×[31m 自動フォーマット (trim/全角→半角) が適用される[39m[32m 1[2mms[22m[39m
+[31m     [31m×[31m ユニーク制約が機能する[39m[32m 1[2mms[22m[39m
+[31m     [31m×[31m 単一主キーの一意制約が機能する[39m[32m 1[2mms[22m[39m
+[31m     [31m×[31m 複合主キーの一意制約が機能する[39m[32m 1[2mms[22m[39m
+[31m     [31m×[31m id 型フィールドは未指定なら UUID 自動採番[39m[32m 1[2mms[22m[39m
+[31m     [31m×[31m 登録時 defaultValue="today" で今日の日付が入る[39m[32m 1[2mms[22m[39m
+[31m     [31m×[31m 更新時 defaultOnUpdate=true で今日の日付に更新[39m[32m 1[2mms[22m[39m
+[31m     [31m×[31m softDelete + defaultOnUpdate=true は削除時に日付が入る[39m[32m 1[2mms[22m[39m
+[31m     [31m×[31m 存在しない FK ID で create → DaoValidationError[39m[32m 1[2mms[22m[39m
+[31m     [31m×[31m 存在する FK ID で create → 成功[39m[32m 1[2mms[22m[39m
+[31m     [31m×[31m onDelete=restrict — 被参照があれば削除を阻止[39m[32m 1[2mms[22m[39m
+[31m     [31m×[31m onDelete=cascade — 被参照レコードも連鎖削除[39m[32m 1[2mms[22m[39m
+[31m     [31m×[31m onDelete=setNull — 被参照レコードのフィールドが null になる[39m[32m 1[2mms[22m[39m
+[31m     [31m×[31m 被参照がなければ restrict でも削除できる[39m[32m 1[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 22 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22minit 直後の list は空
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22mcreate + list で 1 件取れる
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22mrequired を満たさないと DaoValidationError
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22mupdate は id を保持したまま値を差し替える
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22m存在しない id の update は null
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22mremove で消える / もう一度 remove は false
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22m並行 create が全件保存される
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22msoftDelete 有効時、remove は _deleted を立てる
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22m自動フォーマット (trim/全角→半角) が適用される
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22mユニーク制約が機能する
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22m単一主キーの一意制約が機能する
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22m複合主キーの一意制約が機能する
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22mid 型フィールドは未指定なら UUID 自動採番
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22m登録時 defaultValue="today" で今日の日付が入る
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22m更新時 defaultOnUpdate=true で今日の日付に更新
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22msoftDelete + defaultOnUpdate=true は削除時に日付が入る
+[31m[1mError[22m: connect ECONNREFUSED 127.0.0.1:5432[39m
+[90m [2m❯[22m ../node_modules/pg-pool/index.js:[2m45:11[22m[39m
+[36m [2m❯[22m createTestDb src/dao/testDb.ts:[2m43:17[22m[39m
+    [90m 41|[39m   [90m// 初期接続でスキーマを作成する。options の search_path はそのスキーマが[39m
+    [90m 42|[39m   [90m// 既に存在することを前提にしないので、まずスキーマだけ作る。[39m
+    [90m 43|[39m   [35mconst[39m admin [33m=[39m [35mawait[39m pool[33m.[39m[34mconnect[39m()[33m;[39m
+    [90m   |[39m                 [31m^[39m
+    [90m 44|[39m   [35mtry[39m {
+    [90m 45|[39m     [35mawait[39m admin[33m.[39m[34mquery[39m([32m`CREATE SCHEMA [39m[36m${[39m[34mquote[39m(schema)[36m}[39m[32m`[39m)[33m;[39m
+[90m [2m❯[22m src/dao/postgresDao.test.ts:[2m24:10[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/44]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22minit 直後の list は空
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22mcreate + list で 1 件取れる
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22mrequired を満たさないと DaoValidationError
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22mupdate は id を保持したまま値を差し替える
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22m存在しない id の update は null
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22mremove で消える / もう一度 remove は false
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22m並行 create が全件保存される
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22msoftDelete 有効時、remove は _deleted を立てる
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22m自動フォーマット (trim/全角→半角) が適用される
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22mユニーク制約が機能する
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22m単一主キーの一意制約が機能する
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22m複合主キーの一意制約が機能する
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22mid 型フィールドは未指定なら UUID 自動採番
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22m登録時 defaultValue="today" で今日の日付が入る
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22m更新時 defaultOnUpdate=true で今日の日付に更新
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao[2m > [22msoftDelete + defaultOnUpdate=true は削除時に日付が入る
+[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'cleanup')[39m
+[36m [2m❯[22m src/dao/postgresDao.test.ts:[2m36:14[22m[39m
+    [90m 34|[39m
+    [90m 35|[39m   [34mafterEach[39m([35masync[39m () [33m=>[39m {
+    [90m 36|[39m     [35mawait[39m db[33m.[39m[34mcleanup[39m()[33m;[39m
+    [90m   |[39m              [31m^[39m
+    [90m 37|[39m   })[33m;[39m
+    [90m 38|[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/44]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao — FK 整合性[2m > [22m存在しない FK ID で create → DaoValidationError
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao — FK 整合性[2m > [22m存在する FK ID で create → 成功
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao — FK 整合性[2m > [22monDelete=restrict — 被参照があれば削除を阻止
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao — FK 整合性[2m > [22monDelete=cascade — 被参照レコードも連鎖削除
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao — FK 整合性[2m > [22monDelete=setNull — 被参照レコードのフィールドが null になる
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao — FK 整合性[2m > [22m被参照がなければ restrict でも削除できる
+[31m[1mError[22m: connect ECONNREFUSED 127.0.0.1:5432[39m
+[90m [2m❯[22m ../node_modules/pg-pool/index.js:[2m45:11[22m[39m
+[36m [2m❯[22m createTestDb src/dao/testDb.ts:[2m43:17[22m[39m
+    [90m 41|[39m   [90m// 初期接続でスキーマを作成する。options の search_path はそのスキーマが[39m
+    [90m 42|[39m   [90m// 既に存在することを前提にしないので、まずスキーマだけ作る。[39m
+    [90m 43|[39m   [35mconst[39m admin [33m=[39m [35mawait[39m pool[33m.[39m[34mconnect[39m()[33m;[39m
+    [90m   |[39m                 [31m^[39m
+    [90m 44|[39m   [35mtry[39m {
+    [90m 45|[39m     [35mawait[39m admin[33m.[39m[34mquery[39m([32m`CREATE SCHEMA [39m[36m${[39m[34mquote[39m(schema)[36m}[39m[32m`[39m)[33m;[39m
+[90m [2m❯[22m src/dao/postgresDao.test.ts:[2m345:10[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/44]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao — FK 整合性[2m > [22m存在しない FK ID で create → DaoValidationError
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao — FK 整合性[2m > [22m存在する FK ID で create → 成功
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao — FK 整合性[2m > [22monDelete=restrict — 被参照があれば削除を阻止
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao — FK 整合性[2m > [22monDelete=cascade — 被参照レコードも連鎖削除
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao — FK 整合性[2m > [22monDelete=setNull — 被参照レコードのフィールドが null になる
+[41m[1m FAIL [22m[49m src/dao/postgresDao.test.ts[2m > [22mPostgresDao — FK 整合性[2m > [22m被参照がなければ restrict でも削除できる
+[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'cleanup')[39m
+[36m [2m❯[22m src/dao/postgresDao.test.ts:[2m349:14[22m[39m
+    [90m347|[39m
+    [90m348|[39m   [34mafterEach[39m([35masync[39m () [33m=>[39m {
+    [90m349|[39m     [35mawait[39m db[33m.[39m[34mcleanup[39m()[33m;[39m
+    [90m   |[39m              [31m^[39m
+    [90m350|[39m   })[33m;[39m
+    [90m351|[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/44]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m22 failed[39m[22m[90m (22)[39m
+[2m   Start at [22m 20:26:23
+[2m   Duration [22m 367ms[2m (transform 117ms, setup 0ms, import 160ms, tests 31ms, environment 0ms)[22m
+
