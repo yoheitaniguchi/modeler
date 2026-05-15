@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: modeler
+      POSTGRES_PASSWORD: modeler
+      POSTGRES_DB: modeler
+    ports:
+      - "5432:5432"
+    volumes:
+      - modeler_pgdata:/var/lib/postgresql/data
+      - ./scripts/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+volumes:
+  modeler_pgdata:

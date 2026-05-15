@@ -1,5 +1,5 @@
 import type { ModelDefinition } from '@modeler/shared';
-import type { JsonFileDao } from './jsonFileDao.js';
+import type { Dao } from './dao.js';
 
 /**
  * DAO レジストリ — デプロイ済みモデルの DAO 一覧を提供する。
@@ -16,7 +16,7 @@ import type { JsonFileDao } from './jsonFileDao.js';
  */
 export interface DaoRegistry {
   /** モデル名から対応する DAO を取得。未デプロイなら undefined。 */
-  get(modelName: string): JsonFileDao | undefined;
+  get(modelName: string): Dao | undefined;
   /** デプロイ済みの全モデル定義を返す。被参照スキャン用。 */
   models(): ModelDefinition[];
 }
@@ -27,11 +27,11 @@ export interface DaoRegistry {
  */
 export class DaoRegistryImpl implements DaoRegistry {
   constructor(
-    private readonly daoMap: Map<string, JsonFileDao>,
+    private readonly daoMap: Map<string, Dao>,
     private readonly modelList: ModelDefinition[],
   ) {}
 
-  get(modelName: string): JsonFileDao | undefined {
+  get(modelName: string): Dao | undefined {
     return this.daoMap.get(modelName);
   }
 

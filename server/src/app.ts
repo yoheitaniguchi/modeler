@@ -3,8 +3,10 @@ import cors from 'cors';
 import path from 'node:path';
 import { promises as fsp, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { DeployError, DeployRegistry } from './deploy/registry.js';
+import { DeployError, DeployRegistry, DestructiveChangeError } from './deploy/registry.js';
 import { logger } from './services/logger.js';
+import { getPool } from './db/pool.js';
+import { dropTableForModel } from './db/schema.js';
 
 /**
  * Express アプリのファクトリ関数。
@@ -15,21 +17,20 @@ import { logger } from './services/logger.js';
  *   - データディレクトリをテストごとに切り替えられる (= 副作用を隔離)。
  */
 export interface AppOptions {
-  dataDir?: string;
-  /** 設定された場合、その配下の静的ファイルを配信する (E2E / 本番モード)。 */
+  /**
+   * クライアント配信ディレクトリ。指定された場合、その配下の静的ファイルを配信する (E2E / 本番モード)。
+   */
   clientDistDir?: string;
+}
+
+function isForce(req: express.Request): boolean {
+  return String(req.query.force ?? '').toLowerCase() === 'true';
 }
 
 export function createApp(options: AppOptions = {}): {
   app: Express;
   registry: DeployRegistry;
-  dataDir: string;
 } {
-  const dataDir =
-    options.dataDir ??
-    process.env.MODELER_DATA_DIR ??
-    path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
-
   const app = express();
   app.use(cors()); // 開発用ツールなのでオリジン制限はしない
   app.use(express.json());
@@ -45,18 +46,28 @@ export function createApp(options: AppOptions = {}): {
     res.json({ models });
   });
 
-  // メタ API: デプロイ
+  // メタ API: デプロイ (force=true で破壊的変更も許可)
   app.post('/meta/deploy', async (req, res) => {
     try {
-      logger.info('Deploying model', { modelName: req.body.name });
-      const result = await registry.deploy(req.body, dataDir);
+      const force = isForce(req);
+      logger.info('Deploying model', { modelName: req.body.name, force });
+      const result = await registry.deploy(req.body, { force });
       logger.info('Model deployed successfully', { modelName: req.body.name });
       res.status(200).json(result);
     } catch (e) {
+      if (e instanceof DestructiveChangeError) {
+        logger.warn('Destructive change requires confirmation', { warnings: e.warnings });
+        res.status(409).json({
+          requiresConfirmation: true,
+          warnings: e.warnings,
+          changes: e.changes.map((c) => ({ kind: c.kind, field: c.field, detail: c.detail })),
+        });
+        return;
+      }
       if (e instanceof DeployError) {
         logger.warn('Deployment validation failed', {
           modelName: req.body.name,
-          errors: e.errors
+          errors: e.errors,
         });
         res.status(400).json({ errors: e.errors });
         return;
@@ -66,23 +77,32 @@ export function createApp(options: AppOptions = {}): {
     }
   });
 
-  // メタ API: デプロイ済みモデルの定義更新 (再デプロイ・データ保持)
   app.put('/meta/models/:name', async (req, res) => {
     try {
-      logger.info('Updating model definition', { modelName: req.params.name });
-      const updated = await registry.updateModel(req.params.name, req.body, dataDir);
+      const force = isForce(req);
+      logger.info('Updating model definition', { modelName: req.params.name, force });
+      const updated = await registry.updateModel(req.params.name, req.body, { force });
       if (!updated) {
         logger.warn('Model update failed - model not found', { modelName: req.params.name });
         res.status(404).json({ errors: ['model not found'] });
         return;
       }
       logger.info('Model definition updated successfully', { modelName: req.params.name });
-      res.json({ model: updated });
+      res.json({ model: updated.model, warnings: updated.warnings });
     } catch (e) {
+      if (e instanceof DestructiveChangeError) {
+        logger.warn('Destructive change requires confirmation', { warnings: e.warnings });
+        res.status(409).json({
+          requiresConfirmation: true,
+          warnings: e.warnings,
+          changes: e.changes.map((c) => ({ kind: c.kind, field: c.field, detail: c.detail })),
+        });
+        return;
+      }
       if (e instanceof DeployError) {
         logger.warn('Model update validation failed', {
           modelName: req.params.name,
-          errors: e.errors
+          errors: e.errors,
         });
         res.status(400).json({ errors: e.errors });
         return;
@@ -92,20 +112,32 @@ export function createApp(options: AppOptions = {}): {
     }
   });
 
-  // メタ API: デプロイ済みモデルを削除
-  app.delete('/meta/models/:name', (_req, res) => {
-    logger.info('Deleting model', { modelName: _req.params.name });
-    const removed = registry.removeModel(_req.params.name);
-    if (removed) {
-      logger.info('Model deleted successfully', { modelName: _req.params.name });
-      res.status(204).end();
-    } else {
-      logger.warn('Model deletion failed - model not found', { modelName: _req.params.name });
-      res.status(404).end();
+  app.delete('/meta/models/:name', async (req, res) => {
+    try {
+      const force = isForce(req);
+      logger.info('Deleting model', { modelName: req.params.name, force });
+      const removed = await registry.removeModel(req.params.name, { force });
+      if (removed) {
+        logger.info('Model deleted successfully', { modelName: req.params.name });
+        res.status(204).end();
+      } else {
+        logger.warn('Model deletion failed - model not found', { modelName: req.params.name });
+        res.status(404).end();
+      }
+    } catch (e) {
+      if (e instanceof DestructiveChangeError) {
+        res.status(409).json({
+          requiresConfirmation: true,
+          warnings: e.warnings,
+          changes: e.changes.map((c) => ({ kind: c.kind, field: c.field, detail: c.detail })),
+        });
+        return;
+      }
+      logger.error('Unexpected model delete error', e instanceof Error ? e : new Error(String(e)));
+      res.status(500).json({ error: 'internal error' });
     }
   });
 
-  // ログ受信エンドポイント (クライアントログの記録)
   app.post('/meta/logs', (req, res) => {
     const { level, message, data, error, stack } = req.body;
     logger.info('Client log received', {
@@ -113,12 +145,11 @@ export function createApp(options: AppOptions = {}): {
       message,
       data,
       error,
-      stack
+      stack,
     });
     res.status(200).json({ status: 'ok' });
   });
 
-  // E2E テスト用エコーエンドポイント (本番でも害は無いが必要なら NODE_ENV で切り分け)
   app.post('/test/echo', (req, res) => {
     res.json({ method: 'POST', body: req.body, ts: Date.now() });
   });
@@ -126,18 +157,25 @@ export function createApp(options: AppOptions = {}): {
     res.json({ method: 'GET', query: req.query, ts: Date.now() });
   });
 
-  // E2E テスト用: 全モデルを削除しデータファイルも消す。
-  // これがないと前のテストで作ったレコードが次のテストに紛れ込む。
+  // E2E テスト用: 全モデルを削除しテーブルも DROP する。
   app.post('/test/reset', async (_req, res) => {
     logger.info('Resetting test environment');
     try {
-      for (const m of registry.list()) registry.removeModel(m.name);
-      const entries = await fsp.readdir(dataDir);
-      await Promise.all(
-        entries
-          .filter((n) => n.endsWith('.json'))
-          .map((n) => fsp.rm(path.join(dataDir, n), { force: true })),
-      );
+      const pool = getPool();
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        for (const m of registry.list()) {
+          await dropTableForModel(client, m.name, { cascade: true });
+        }
+        await client.query('COMMIT');
+      } catch (e) {
+        try { await client.query('ROLLBACK'); } catch { /* noop */ }
+        throw e;
+      } finally {
+        client.release();
+      }
+      registry.reset();
       logger.info('Test environment reset completed');
     } catch (e) {
       logger.error('Error during test reset', e instanceof Error ? e : new Error(String(e)));
@@ -145,13 +183,10 @@ export function createApp(options: AppOptions = {}): {
     res.status(204).end();
   });
 
-  // ヘルスチェック (環境構築テスト用)
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
   });
 
-  // E2E / 本番モード: client の build 成果物を同一サーバーから配信。
-  // CLIENT_DIST_DIR 未指定時は ../../client/dist を見に行く (build 後に存在)。
   const clientDistDir =
     options.clientDistDir ??
     process.env.CLIENT_DIST_DIR ??
@@ -159,7 +194,6 @@ export function createApp(options: AppOptions = {}): {
   if (existsSync(clientDistDir)) {
     app.use(express.static(clientDistDir));
     app.use('/modeler', express.static(clientDistDir));
-    // SPA フォールバック: 既知の API パスでない GET は index.html を返す
     app.get(/^\/(?!api|meta|test|health).*/, async (_req, res, next) => {
       try {
         const html = await fsp.readFile(path.join(clientDistDir, 'index.html'), 'utf-8');
@@ -170,5 +204,5 @@ export function createApp(options: AppOptions = {}): {
     });
   }
 
-  return { app, registry, dataDir };
+  return { app, registry };
 }

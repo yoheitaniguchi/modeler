@@ -46,6 +46,13 @@ export interface ModelerViewModel {
   importJson: (text: string) => boolean;
   deploy: () => Promise<boolean>;
 
+  /** 破壊的変更で確認待ちの場合の警告メッセージ一覧 (null なら確認不要)。 */
+  destructiveWarnings: string[] | null;
+  /** 確認ダイアログで「強制デプロイ」を選んだ際に呼ぶ。 */
+  confirmDestructiveDeploy: () => Promise<boolean>;
+  /** 確認ダイアログをキャンセル。 */
+  cancelDestructiveDeploy: () => void;
+
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
@@ -294,6 +301,44 @@ export function useModelerViewModel(api: ApiClient): ModelerViewModel {
     }
   }, [history]);
 
+  // 破壊的変更が検出されてユーザー確認待ちの状態
+  const [destructiveWarnings, setDestructiveWarnings] = useState<string[] | null>(null);
+  // 確認後に再送する payload を保持 (デプロイ要求時の document スナップショット)
+  const pendingDocRef = useRef<ModelDefinitionDocument | null>(null);
+
+  const performDeploy = useCallback(
+    async (doc: ModelDefinitionDocument, force: boolean): Promise<boolean> => {
+      try {
+        await api.deploy(stripClientFields(doc), force ? { force: true } : undefined);
+        setErrors([]);
+        setNotice(force ? 'デプロイしました (破壊的変更を適用)' : 'デプロイしました');
+        setDestructiveWarnings(null);
+        pendingDocRef.current = null;
+        return true;
+      } catch (e) {
+        if (e instanceof ApiError) {
+          const destructive = e.destructiveChange();
+          if (destructive) {
+            // ユーザー確認待ち状態にする (実体の DDL は適用されていない)
+            setDestructiveWarnings(destructive.warnings);
+            pendingDocRef.current = doc;
+            setNotice(null);
+            setErrors([]);
+            return false;
+          }
+          setErrors(e.toMessages());
+        } else {
+          setErrors([String(e)]);
+        }
+        setNotice(null);
+        setDestructiveWarnings(null);
+        pendingDocRef.current = null;
+        return false;
+      }
+    },
+    [api],
+  );
+
   const deploy = useCallback(async (): Promise<boolean> => {
     const result = validateDocument(document);
     if (!result.ok) {
@@ -301,22 +346,18 @@ export function useModelerViewModel(api: ApiClient): ModelerViewModel {
       setNotice(null);
       return false;
     }
-    try {
-      // __clientId はサーバーに送らない
-      await api.deploy(stripClientFields(document));
-      setErrors([]);
-      setNotice('デプロイしました');
-      return true;
-    } catch (e) {
-      if (e instanceof ApiError) {
-        setErrors(e.toMessages());
-      } else {
-        setErrors([String(e)]);
-      }
-      setNotice(null);
-      return false;
-    }
-  }, [api, document]);
+    return performDeploy(document, false);
+  }, [document, performDeploy]);
+
+  const confirmDestructiveDeploy = useCallback(async (): Promise<boolean> => {
+    const doc = pendingDocRef.current ?? document;
+    return performDeploy(doc, true);
+  }, [document, performDeploy]);
+
+  const cancelDestructiveDeploy = useCallback(() => {
+    setDestructiveWarnings(null);
+    pendingDocRef.current = null;
+  }, []);
 
   const restoreDraft = useCallback((): boolean => {
     const draft = loadDraft();
@@ -379,6 +420,9 @@ export function useModelerViewModel(api: ApiClient): ModelerViewModel {
     discardDraft,
     selectedKey,
     select,
+    destructiveWarnings,
+    confirmDestructiveDeploy,
+    cancelDestructiveDeploy,
   };
 }
 

@@ -43,11 +43,32 @@ export interface CallButtonResponse {
   data: unknown;
 }
 
+/**
+ * 破壊的変更を確認待ちの場合のサーバーレスポンス (HTTP 409)。
+ */
+export interface DestructiveChangePayload {
+  requiresConfirmation: true;
+  warnings: string[];
+  changes: Array<{ kind: string; field?: string; detail: string }>;
+}
+
+export interface DeployOptions {
+  /** true の場合 ?force=true を付与し破壊的変更も適用する。 */
+  force?: boolean;
+}
+
 export interface ApiClient {
-  deploy(doc: ModelDefinitionDocument): Promise<{ deployed: ModelDefinition[] }>;
+  deploy(
+    doc: ModelDefinitionDocument,
+    opts?: DeployOptions,
+  ): Promise<{ deployed: ModelDefinition[]; warnings?: string[] }>;
   listModels(): Promise<ModelDefinition[]>;
-  updateModel(name: string, model: ModelDefinition): Promise<ModelDefinition>;
-  deleteModel(name: string): Promise<void>;
+  updateModel(
+    name: string,
+    model: ModelDefinition,
+    opts?: DeployOptions,
+  ): Promise<{ model: ModelDefinition; warnings?: string[] }>;
+  deleteModel(name: string, opts?: DeployOptions): Promise<void>;
   list(modelName: string): Promise<ModelRecord[]>;
   create(modelName: string, body: Record<string, unknown>): Promise<ModelRecord>;
   update(modelName: string, id: string, body: Record<string, unknown>): Promise<ModelRecord>;
@@ -67,23 +88,30 @@ export interface ApiClient {
 export class HttpApiClient implements ApiClient {
   constructor(private readonly baseUrl: string = '') {}
 
-  async deploy(doc: ModelDefinitionDocument) {
-    return this.request<{ deployed: ModelDefinition[] }>('POST', '/meta/deploy', doc);
+  async deploy(doc: ModelDefinitionDocument, opts: DeployOptions = {}) {
+    const qs = opts.force ? '?force=true' : '';
+    return this.request<{ deployed: ModelDefinition[]; warnings?: string[] }>(
+      'POST',
+      `/meta/deploy${qs}`,
+      doc,
+    );
   }
   async listModels() {
     const res = await this.request<{ models: ModelDefinition[] }>('GET', '/meta/models');
     return res.models;
   }
-  async updateModel(name: string, model: ModelDefinition) {
-    const res = await this.request<{ model: ModelDefinition }>(
+  async updateModel(name: string, model: ModelDefinition, opts: DeployOptions = {}) {
+    const qs = opts.force ? '?force=true' : '';
+    const res = await this.request<{ model: ModelDefinition; warnings?: string[] }>(
       'PUT',
-      `/meta/models/${name}`,
+      `/meta/models/${name}${qs}`,
       model,
     );
-    return res.model;
+    return { model: res.model, warnings: res.warnings };
   }
-  async deleteModel(name: string) {
-    await this.request<void>('DELETE', `/meta/models/${name}`);
+  async deleteModel(name: string, opts: DeployOptions = {}) {
+    const qs = opts.force ? '?force=true' : '';
+    await this.request<void>('DELETE', `/meta/models/${name}${qs}`);
   }
   async callCustom(req: CallButtonRequest): Promise<CallButtonResponse> {
     const headers: Record<string, string> =
@@ -163,5 +191,16 @@ export class ApiError extends Error {
       if (Array.isArray(errors)) return errors.map(String);
     }
     return [`HTTP ${this.status}`];
+  }
+  /**
+   * 破壊的変更で確認要求された 409 レスポンスの場合に payload を返す。
+   * UI 側はこれを使って確認ダイアログを出す。
+   */
+  destructiveChange(): DestructiveChangePayload | null {
+    if (this.status !== 409) return null;
+    const p = this.payload;
+    if (!p || typeof p !== 'object') return null;
+    if (!('requiresConfirmation' in p) || (p as { requiresConfirmation?: unknown }).requiresConfirmation !== true) return null;
+    return p as DestructiveChangePayload;
   }
 }

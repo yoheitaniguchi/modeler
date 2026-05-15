@@ -1,14 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
-import { promises as fs } from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import type { ModelDefinitionDocument } from '@modeler/shared';
 import { createApp } from './app.js';
+import { createTestDb, TEST_DB_AVAILABLE, type TestDbHandle } from './dao/testDb.js';
+import { closePool } from './db/pool.js';
 
 /**
  * 一括インポート / エクスポート API テスト。
- * app.test.ts と同様のパターン: 実際の Express + JsonFileDao を使う。
+ * 実 Postgres を使ってデプロイ → CRUD を一通り検証する。
  */
 
 const document: ModelDefinitionDocument = {
@@ -26,19 +25,34 @@ const document: ModelDefinitionDocument = {
   ],
 };
 
-describe('一括インポート / エクスポート API', () => {
-  let dataDir: string;
+let savedDatabaseUrl: string | undefined;
+
+describe.skipIf(!TEST_DB_AVAILABLE)('一括インポート / エクスポート API', () => {
+  let db: TestDbHandle;
   let app: ReturnType<typeof createApp>['app'];
 
+  beforeAll(() => {
+    savedDatabaseUrl = process.env.DATABASE_URL;
+  });
+
+  afterAll(async () => {
+    if (savedDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL = savedDatabaseUrl;
+    await closePool();
+  });
+
   beforeEach(async () => {
-    dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'modeler-bulk-'));
-    app = createApp({ dataDir }).app;
+    db = await createTestDb();
+    process.env.DATABASE_URL = composeUrl(db);
+    await closePool();
+    app = createApp({ clientDistDir: 'nonexistent' }).app;
     // customer モデルをデプロイ
     await request(app).post('/meta/deploy').send(document);
   });
 
   afterEach(async () => {
-    await fs.rm(dataDir, { recursive: true, force: true });
+    await closePool();
+    await db.cleanup();
   });
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -172,3 +186,10 @@ describe('一括インポート / エクスポート API', () => {
     });
   });
 });
+
+function composeUrl(db: TestDbHandle): string {
+  const raw = process.env.TEST_DATABASE_URL ?? savedDatabaseUrl;
+  if (!raw) throw new Error('TEST_DATABASE_URL or DATABASE_URL must be set');
+  const sep = raw.includes('?') ? '&' : '?';
+  return `${raw}${sep}options=${encodeURIComponent(`-c search_path=${db.schema}`)}`;
+}

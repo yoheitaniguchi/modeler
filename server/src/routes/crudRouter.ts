@@ -2,7 +2,10 @@ import { Router } from 'express';
 import multer from 'multer';
 import type { ModelDefinition, ImportFormat } from '@modeler/shared';
 import { parseBulkImport, serializeRecords, formatErrorLog } from '@modeler/shared';
-import { DaoValidationError, JsonFileDao } from '../dao/jsonFileDao.js';
+import type { Dao } from '../dao/dao.js';
+import { DaoValidationError } from '../dao/dao.js';
+import { PostgresDao } from '../dao/postgresDao.js';
+import { getPool } from '../db/pool.js';
 
 /**
  * 1 つのモデル定義から CRUD 用 Router を組み立てる。
@@ -33,12 +36,12 @@ import { DaoValidationError, JsonFileDao } from '../dao/jsonFileDao.js';
 /** multer: メモリに保存 (ファイルをディスクに書かない) */
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-export function createCrudRouter(model: ModelDefinition, dataDir: string): {
+export function createCrudRouter(model: ModelDefinition): {
   router: Router;
   ready: Promise<void>;
-  dao: JsonFileDao;
+  dao: Dao;
 } {
-  const dao = new JsonFileDao(model, dataDir);
+  const dao: Dao = new PostgresDao(model, getPool());
   const ready = dao.init();
   const router = Router();
 

@@ -1,14 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { promises as fs } from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { ModelDefinitionDocument } from '@modeler/shared';
-import { DeployRegistry } from './registry.js';
-
-/**
- * DeployRegistry の DAO 配線まわり (Task 5) の単体テスト。
- * 整合性チェック自体の動作は Task 6 で jsonFileDao.test.ts に追加する。
- */
+import { DeployRegistry, DestructiveChangeError } from './registry.js';
+import { createTestDb, TEST_DB_AVAILABLE, type TestDbHandle } from '../dao/testDb.js';
+import { closePool } from '../db/pool.js';
 
 const doc: ModelDefinitionDocument = {
   version: 1,
@@ -35,55 +29,95 @@ const doc: ModelDefinitionDocument = {
   ],
 };
 
-describe('DeployRegistry — DAO レジストリ配線', () => {
-  let dataDir: string;
+let savedDatabaseUrl: string | undefined;
+
+describe.skipIf(!TEST_DB_AVAILABLE)('DeployRegistry — DAO レジストリ配線', () => {
+  let db: TestDbHandle;
   let registry: DeployRegistry;
 
+  beforeAll(() => {
+    savedDatabaseUrl = process.env.DATABASE_URL;
+  });
+
+  afterAll(async () => {
+    if (savedDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL = savedDatabaseUrl;
+    await closePool();
+  });
+
   beforeEach(async () => {
-    dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'modeler-reg-'));
+    db = await createTestDb();
+    process.env.DATABASE_URL = composeUrl(db);
+    await closePool();
     registry = new DeployRegistry();
   });
 
   afterEach(async () => {
-    await fs.rm(dataDir, { recursive: true, force: true });
+    await closePool();
+    await db.cleanup();
   });
 
   it('deploy 後に getDao で各モデルの DAO が引ける', async () => {
-    await registry.deploy(doc, dataDir);
+    await registry.deploy(doc);
     expect(registry.getDao('department')).toBeDefined();
     expect(registry.getDao('employee')).toBeDefined();
     expect(registry.getDao('unknown')).toBeUndefined();
   });
 
-  it('各 DAO に DaoRegistry が注入され、相互に他 DAO を参照できる', async () => {
-    await registry.deploy(doc, dataDir);
+  it('各 DAO に DaoRegistry が注入され、相互に参照できる', async () => {
+    await registry.deploy(doc);
     const empDao = registry.getDao('employee')!;
-    // private を覗き見るのは避けつつ、registry 経由で他 DAO が引けることを実証する
-    // ため Department を 1 件作成 → Employee から参照可能 (存在 ID として認識される)
     const dept = await registry.getDao('department')!.create({ name: 'sales' });
-    const found = await empDao.create({ name: 'Alice', dept: dept.id });
-    expect(found.dept).toBe(dept.id);
+    const emp = await empDao.create({ name: 'Alice', dept: dept.id });
+    expect(emp.dept).toBe(dept.id);
   });
 
-  it('updateModel 後も DAO レジストリは再配線される', async () => {
-    await registry.deploy(doc, dataDir);
-    const empOld = registry.getDao('employee');
-    expect(empOld).toBeDefined();
+  it('updateModel で破壊的変更があると DestructiveChangeError', async () => {
+    await registry.deploy(doc);
+    await registry.getDao('employee')!.create({ name: 'A' });
+    // 破壊的変更: 必須カラム追加 (空でないテーブル)
     const updated = {
       ...doc.models[1],
-      label: '従業員(改)',
+      fields: [
+        ...doc.models[1].fields,
+        { name: 'email', label: 'メール', type: 'string' as const, required: true },
+      ],
     };
-    await registry.updateModel('employee', updated, dataDir);
-    const empNew = registry.getDao('employee');
-    expect(empNew).toBeDefined();
-    // 同じ参照とは限らない (新しい DAO に差し替わる) が、必ず存在すること
+    await expect(registry.updateModel('employee', updated)).rejects.toBeInstanceOf(DestructiveChangeError);
+  });
+
+  it('updateModel に force=true なら破壊的変更も適用', async () => {
+    await registry.deploy(doc);
+    // department にレコードを 1 件作って、それから列を消す
+    await registry.getDao('department')!.create({ name: 'sales' });
+    const updated = {
+      ...doc.models[0],
+      fields: [], // name 列を消す — 空でないテーブルへの破壊的変更
+    };
+    // バリデーション: fields は最低 1 つ必要 — 別の破壊的変更で試す
+    const dropAge = {
+      ...doc.models[1],
+      fields: doc.models[1].fields.filter((f) => f.name !== 'dept'),
+    };
+    await registry.getDao('employee')!.create({ name: 'X' });
+    await expect(registry.updateModel('employee', dropAge)).rejects.toBeInstanceOf(DestructiveChangeError);
+    const ok = await registry.updateModel('employee', dropAge, { force: true });
+    expect(ok).not.toBeNull();
   });
 
   it('removeModel 後は対象 DAO が引けなくなる', async () => {
-    await registry.deploy(doc, dataDir);
+    await registry.deploy(doc);
     expect(registry.getDao('employee')).toBeDefined();
-    registry.removeModel('employee');
+    const result = await registry.removeModel('employee');
+    expect(result?.ok).toBe(true);
     expect(registry.getDao('employee')).toBeUndefined();
     expect(registry.getDao('department')).toBeDefined();
   });
 });
+
+function composeUrl(db: TestDbHandle): string {
+  const raw = process.env.TEST_DATABASE_URL ?? savedDatabaseUrl;
+  if (!raw) throw new Error('TEST_DATABASE_URL or DATABASE_URL must be set');
+  const sep = raw.includes('?') ? '&' : '?';
+  return `${raw}${sep}options=${encodeURIComponent(`-c search_path=${db.schema}`)}`;
+}
