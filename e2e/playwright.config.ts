@@ -58,6 +58,7 @@ export default defineConfig({
       ...process.env,
       MODELER_DATA_DIR: path.join(repoRoot, 'e2e', '.e2e-data'),
       CLIENT_DIST_DIR: path.join(repoRoot, 'client', 'dist'),
+      DATABASE_URL: process.env.DATABASE_URL || 'postgresql://modeler:modeler@localhost:5432/modeler',
       PORT: '4000',
       NODE_ENV: 'production',
     },

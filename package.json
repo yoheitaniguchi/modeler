@@ -15,14 +15,19 @@
     "dev:client": "npm run dev --workspace=client",
     "clean": "rm -rf shared/dist server/dist client/dist client/tsconfig.tsbuildinfo",
     "build": "npm run clean && npm run build --workspace=shared && npm run build --workspace=server && npm run build --workspace=client",
-    "test": "npm run test --workspace=shared && npm run test --workspace=server && npm run test --workspace=client",
-    "test:server": "npm run test --workspace=server",
+    "test": "DATABASE_URL=${DATABASE_URL:-postgresql://modeler:modeler@localhost:5432/modeler} concurrently \"npm run test --workspace=shared\" \"npm run test --workspace=server\" \"npm run test --workspace=client\"",
+    "test:server": "DATABASE_URL=${DATABASE_URL:-postgresql://modeler:modeler@localhost:5432/modeler} npm run test --workspace=server",
     "test:client": "npm run test --workspace=client",
     "test:e2e": "npm run test --workspace=e2e",
     "test:e2e:chromium": "npm run test:chromium --workspace=e2e",
     "test:e2e:firefox": "npm run test:firefox --workspace=e2e",
     "test:e2e:webkit": "npm run test:webkit --workspace=e2e",
-    "test:e2e:ui": "npm run test:ui --workspace=e2e"
+    "test:e2e:ui": "npm run test:ui --workspace=e2e",
+    "docker:dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d",
+    "docker:dev:build": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build",
+    "docker:test": "docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm e2e",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
