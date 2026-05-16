@@ -10,6 +10,7 @@ import type {
   ScreenLayout,
 } from './model.js';
 import { RELATION_KINDS, REFERENTIAL_ACTIONS, SCREEN_LAYOUTS } from './model.js';
+import { getMessage, MSG } from './messages.js';
 
 /**
  * バリデーション関数群。
@@ -542,7 +543,7 @@ export function validateRecord(
     const isEmpty = value === undefined || value === null || value === '';
     const isRequired = field.required || field.primaryKey === true;
     if (isRequired && isEmpty) {
-      errors.push(`${field.name}: is required`);
+      errors.push(`${field.name}: ${getMessage(MSG.RECORD_REQUIRED)}`);
       continue;
     }
     if (isEmpty) continue; // optional な空値は OK
@@ -552,20 +553,20 @@ export function validateRecord(
       case 'reference': // reference も基本は ID なので string
       case 'id': // id 型も文字列
         if (typeof value !== 'string') {
-          errors.push(`${field.name}: must be string`);
+          errors.push(`${field.name}: ${getMessage(MSG.RECORD_MUST_BE_STRING)}`);
         } else {
           if (field.validation) {
             if (field.validation.minLength !== undefined && value.length < field.validation.minLength) {
-              errors.push(`${field.name}: must be at least ${field.validation.minLength} characters`);
+              errors.push(`${field.name}: ${getMessage(MSG.RECORD_MIN_LENGTH, { minLength: field.validation.minLength })}`);
             }
             if (field.validation.maxLength !== undefined && value.length > field.validation.maxLength) {
-              errors.push(`${field.name}: must be at most ${field.validation.maxLength} characters`);
+              errors.push(`${field.name}: ${getMessage(MSG.RECORD_MAX_LENGTH, { maxLength: field.validation.maxLength })}`);
             }
             if (field.validation.pattern) {
               try {
                 const regex = new RegExp(field.validation.pattern);
                 if (!regex.test(value)) {
-                  errors.push(`${field.name}: must match pattern ${field.validation.pattern}`);
+                  errors.push(`${field.name}: ${getMessage(MSG.RECORD_MUST_MATCH_PATTERN, { pattern: field.validation.pattern })}`);
                 }
               } catch (e) {
                 // invalid regex
@@ -576,25 +577,25 @@ export function validateRecord(
         break;
       case 'number':
         if (typeof value !== 'number' || Number.isNaN(value)) {
-          errors.push(`${field.name}: must be number`);
+          errors.push(`${field.name}: ${getMessage(MSG.RECORD_MUST_BE_NUMBER)}`);
         } else {
           if (field.validation) {
             if (field.validation.min !== undefined && value < field.validation.min) {
-              errors.push(`${field.name}: must be at least ${field.validation.min}`);
+              errors.push(`${field.name}: ${getMessage(MSG.RECORD_MIN_VALUE, { min: field.validation.min })}`);
             }
             if (field.validation.max !== undefined && value > field.validation.max) {
-              errors.push(`${field.name}: must be at most ${field.validation.max}`);
+              errors.push(`${field.name}: ${getMessage(MSG.RECORD_MAX_VALUE, { max: field.validation.max })}`);
             }
           }
         }
         break;
       case 'boolean':
-        if (typeof value !== 'boolean') errors.push(`${field.name}: must be boolean`);
+        if (typeof value !== 'boolean') errors.push(`${field.name}: ${getMessage(MSG.RECORD_MUST_BE_BOOLEAN)}`);
         break;
       case 'date':
         // JSON で日付を運ぶ際は ISO 文字列が一番互換性が高い。
         if (typeof value !== 'string' || Number.isNaN(Date.parse(value))) {
-          errors.push(`${field.name}: must be ISO date string`);
+          errors.push(`${field.name}: ${getMessage(MSG.RECORD_MUST_BE_ISO_DATE)}`);
         }
         break;
     }

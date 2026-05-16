@@ -1,5 +1,6 @@
 import type { ModelDefinition, Record as ModelRecord } from './model.js';
 import { validateRecord } from './validation.js';
+import { getMessage, MSG } from './messages.js';
 
 /** サポートするインポートフォーマット */
 export type ImportFormat = 'csv' | 'tsv' | 'json';
@@ -122,7 +123,7 @@ export function parseBulkImport(
     if (format === 'json') {
       const parsed = JSON.parse(text);
       if (!Array.isArray(parsed)) {
-        return { records: [], rowErrors: [], parseError: 'JSON のルートは配列である必要があります' };
+        return { records: [], rowErrors: [], parseError: getMessage(MSG.IMPORT_JSON_ROOT_MUST_BE_ARRAY) };
       }
       rawRows = parsed as Record<string, unknown>[];
     } else {
@@ -147,12 +148,12 @@ export function parseBulkImport(
     return {
       records: [],
       rowErrors: [],
-      parseError: `パースエラー: ${e instanceof Error ? e.message : String(e)}`,
+      parseError: getMessage(MSG.IMPORT_PARSE_ERROR, { error: e instanceof Error ? e.message : String(e) }),
     };
   }
 
   if (rawRows.length === 0) {
-    return { records: [], rowErrors: [], parseError: 'データ行が 0 件です' };
+    return { records: [], rowErrors: [], parseError: getMessage(MSG.IMPORT_NO_DATA_ROWS) };
   }
 
   // --- バリデーション ---

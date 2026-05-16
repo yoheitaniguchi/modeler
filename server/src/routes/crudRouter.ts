@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import type { ModelDefinition, ImportFormat } from '@modeler/shared';
-import { parseBulkImport, serializeRecords, formatErrorLog } from '@modeler/shared';
+import { parseBulkImport, serializeRecords, formatErrorLog, getMessage, MSG } from '@modeler/shared';
 import type { Dao } from '../dao/dao.js';
 import { DaoValidationError } from '../dao/dao.js';
 import { PostgresDao } from '../dao/postgresDao.js';
@@ -56,7 +56,7 @@ export function createCrudRouter(model: ModelDefinition): {
   router.get('/export', async (req, res) => {
     const format = (req.query['format'] as string | undefined) ?? 'csv';
     if (!['csv', 'tsv', 'json'].includes(format)) {
-      res.status(400).json({ error: 'format must be csv, tsv, or json' });
+      res.status(400).json({ error: getMessage(MSG.HTTP_INVALID_FORMAT) });
       return;
     }
     const records = await dao.list();
@@ -86,12 +86,12 @@ export function createCrudRouter(model: ModelDefinition): {
   // NOTE: /:id より先に登録しないと "import" が id パラメータとして解釈される。
   router.post('/import', upload.single('file'), async (req, res) => {
     if (!req.file) {
-      res.status(400).json({ error: 'file is required' });
+      res.status(400).json({ error: getMessage(MSG.HTTP_IMPORT_FILE_REQUIRED) });
       return;
     }
     const format = (req.body as Record<string, string>)['format'] ?? 'csv';
     if (!['csv', 'tsv', 'json'].includes(format)) {
-      res.status(400).json({ error: 'format must be csv, tsv, or json' });
+      res.status(400).json({ error: getMessage(MSG.HTTP_INVALID_FORMAT) });
       return;
     }
 
@@ -151,7 +151,7 @@ export function createCrudRouter(model: ModelDefinition): {
   router.get('/:id', async (req, res) => {
     const found = await dao.get(req.params.id);
     if (!found) {
-      res.status(404).json({ error: 'not found' });
+      res.status(404).json({ error: getMessage(MSG.HTTP_NOT_FOUND) });
       return;
     }
     res.json(found);
@@ -176,7 +176,7 @@ export function createCrudRouter(model: ModelDefinition): {
     try {
       const updated = await dao.update(req.params.id, req.body ?? {});
       if (!updated) {
-        res.status(404).json({ error: 'not found' });
+        res.status(404).json({ error: getMessage(MSG.HTTP_NOT_FOUND) });
         return;
       }
       res.json(updated);
@@ -194,7 +194,7 @@ export function createCrudRouter(model: ModelDefinition): {
     try {
       const removed = await dao.remove(req.params.id);
       if (!removed) {
-        res.status(404).json({ error: 'not found' });
+        res.status(404).json({ error: getMessage(MSG.HTTP_NOT_FOUND) });
         return;
       }
       res.status(204).end();
