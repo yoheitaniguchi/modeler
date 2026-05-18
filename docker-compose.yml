@@ -25,7 +25,7 @@ services:
     container_name: modeler-app
     restart: unless-stopped
     ports:
-      - "4000:4000"
+      - "0.0.0.0:4000:4000"
     volumes:
       - modeler-data:/app/data
       - modeler-logs:/app/log

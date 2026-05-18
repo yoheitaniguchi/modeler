@@ -10,6 +10,48 @@ services:
     volumes:
       - modeler_pgdata:/var/lib/postgresql/data
       - ./scripts/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U modeler -d modeler"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    working_dir: /app
+    command: npm run dev --workspace=server
+    ports:
+      - "0.0.0.0:4000:4000"
+    volumes:
+      - ./shared/src:/app/shared/src
+      - ./server/src:/app/server/src
+    environment:
+      PORT: "4000"
+      NODE_ENV: development
+      DATABASE_URL: postgresql://modeler:modeler@postgres:5432/modeler
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    working_dir: /app
+    command: npm run dev --workspace=client
+    ports:
+      - "0.0.0.0:5173:5173"
+    volumes:
+      - ./client/src:/app/client/src
+      - ./client/public:/app/client/public
+    environment:
+      VITE_API_SERVER: http://server:4000
+    depends_on:
+      - server
 
 volumes:
   modeler_pgdata:

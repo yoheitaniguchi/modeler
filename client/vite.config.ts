@@ -10,15 +10,19 @@ import react from '@vitejs/plugin-react';
 // base は GitHub Pages 配信時のサブパス。
 // 本番デプロイ (deploy.yml) ではデフォルトの '/modeler/' を使い、
 // E2E では root '/' から配信したいので VITE_BASE で上書きできるようにする。
+// Docker環境ではサービス名、ローカル開発ではlocalhostにプロキシする
+const apiServer = process.env.VITE_API_SERVER ?? 'http://localhost:4000';
+
 export default defineConfig({
   base: '',
   plugins: [react()],
   server: {
+    host: '0.0.0.0',
     port: 5173,
     proxy: {
-      '/api': 'http://localhost:4000',
-      '/meta': 'http://localhost:4000',
-      '/test': 'http://localhost:4000',
+      '/api': apiServer,
+      '/meta': apiServer,
+      '/test': apiServer,
     },
   },
   test: {
