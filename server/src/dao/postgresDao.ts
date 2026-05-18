@@ -77,6 +77,15 @@ export class PostgresDao implements Dao {
     return this.rowToRecord(res.rows[0] as Record<string, unknown>);
   }
 
+  async listReferencing(fieldName: string, id: string): Promise<ModelRecord[]> {
+    const where = this.model.softDelete ? ` AND ${quoteIdent('_deleted')} = false` : '';
+    const res = await this.pool.query(
+      `SELECT * FROM ${quoteIdent(this.model.name)} WHERE ${quoteIdent(fieldName)} = $1${where}`,
+      [String(id)],
+    );
+    return res.rows.map((row) => this.rowToRecord(row as Record<string, unknown>));
+  }
+
   // ---- 書き込み ----
 
   async create(input: Record<string, unknown>): Promise<ModelRecord> {
@@ -396,8 +405,7 @@ export class PostgresDao implements Dao {
     const blockErrors: string[] = [];
     for (const inc of incomings) {
       if (inc.field.onDelete !== 'restrict' && inc.field.onDelete !== 'noAction') continue;
-      const all = await inc.otherDao.list();
-      const blockers = all.filter((r) => String(r[inc.field.name]) === String(id));
+      const blockers = await inc.otherDao.listReferencing(inc.field.name, id);
       if (blockers.length > 0) {
         blockErrors.push(
           `cannot delete: ${inc.otherModel.name}.${inc.field.name} still references this id (${blockers.length} record${blockers.length === 1 ? '' : 's'})`,
@@ -409,14 +417,12 @@ export class PostgresDao implements Dao {
     // cascade / setNull を適用
     for (const inc of incomings) {
       if (inc.field.onDelete === 'cascade') {
-        const all = await inc.otherDao.list();
-        const targets = all.filter((r) => String(r[inc.field.name]) === String(id));
+        const targets = await inc.otherDao.listReferencing(inc.field.name, id);
         for (const t of targets) {
           await inc.otherDao.remove(t.id, visited);
         }
       } else if (inc.field.onDelete === 'setNull') {
-        const all = await inc.otherDao.list();
-        const targets = all.filter((r) => String(r[inc.field.name]) === String(id));
+        const targets = await inc.otherDao.listReferencing(inc.field.name, id);
         for (const t of targets) {
           const { id: _id, _deleted, ...rest } = t;
           void _id;
