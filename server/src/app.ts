@@ -7,6 +7,7 @@ import { DeployError, DeployRegistry, DestructiveChangeError } from './deploy/re
 import { logger } from './services/logger.js';
 import { getPool } from './db/pool.js';
 import { dropTableForModel } from './db/schema.js';
+import { getMessage, MSG } from '@modeler/shared';
 
 /**
  * Express アプリのファクトリ関数。
@@ -73,7 +74,7 @@ export function createApp(options: AppOptions = {}): {
         return;
       }
       logger.error('Unexpected deployment error', e instanceof Error ? e : new Error(String(e)));
-      res.status(500).json({ error: 'internal error' });
+      res.status(500).json({ error: getMessage(MSG.HTTP_INTERNAL_ERROR) });
     }
   });
 
@@ -84,7 +85,7 @@ export function createApp(options: AppOptions = {}): {
       const updated = await registry.updateModel(req.params.name, req.body, { force });
       if (!updated) {
         logger.warn('Model update failed - model not found', { modelName: req.params.name });
-        res.status(404).json({ errors: ['model not found'] });
+        res.status(404).json({ errors: [getMessage(MSG.HTTP_MODEL_NOT_FOUND)] });
         return;
       }
       logger.info('Model definition updated successfully', { modelName: req.params.name });
@@ -108,7 +109,7 @@ export function createApp(options: AppOptions = {}): {
         return;
       }
       logger.error('Unexpected model update error', e instanceof Error ? e : new Error(String(e)));
-      res.status(500).json({ error: 'internal error' });
+      res.status(500).json({ error: getMessage(MSG.HTTP_INTERNAL_ERROR) });
     }
   });
 

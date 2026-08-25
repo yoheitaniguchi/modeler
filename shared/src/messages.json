@@ -1,0 +1,29 @@
+{
+  "messages": [
+    { "code": "HTTP_NOT_FOUND", "type": "http", "message": "not found" },
+    { "code": "HTTP_INTERNAL_ERROR", "type": "http", "message": "internal error" },
+    { "code": "HTTP_MODEL_NOT_FOUND", "type": "http", "message": "model not found" },
+    { "code": "HTTP_IMPORT_FILE_REQUIRED", "type": "http", "message": "file is required" },
+    { "code": "HTTP_INVALID_FORMAT", "type": "http", "message": "format must be csv, tsv, or json" },
+    { "code": "IMPORT_JSON_ROOT_MUST_BE_ARRAY", "type": "import", "message": "JSON のルートは配列である必要があります" },
+    { "code": "IMPORT_PARSE_ERROR", "type": "import", "message": "パースエラー: {{error}}" },
+    { "code": "IMPORT_NO_DATA_ROWS", "type": "import", "message": "データ行が 0 件です" },
+    { "code": "RECORD_REQUIRED", "type": "validation", "message": "is required" },
+    { "code": "RECORD_MUST_BE_STRING", "type": "validation", "message": "must be string" },
+    { "code": "RECORD_MIN_LENGTH", "type": "validation", "message": "must be at least {{minLength}} characters" },
+    { "code": "RECORD_MAX_LENGTH", "type": "validation", "message": "must be at most {{maxLength}} characters" },
+    { "code": "RECORD_MUST_MATCH_PATTERN", "type": "validation", "message": "must match pattern {{pattern}}" },
+    { "code": "RECORD_MUST_BE_NUMBER", "type": "validation", "message": "must be number" },
+    { "code": "RECORD_MIN_VALUE", "type": "validation", "message": "must be at least {{min}}" },
+    { "code": "RECORD_MAX_VALUE", "type": "validation", "message": "must be at most {{max}}" },
+    { "code": "RECORD_MUST_BE_BOOLEAN", "type": "validation", "message": "must be boolean" },
+    { "code": "RECORD_MUST_BE_ISO_DATE", "type": "validation", "message": "must be ISO date string" },
+    { "code": "RECORD_MUST_BE_UNIQUE", "type": "validation", "message": "must be unique" },
+    { "code": "RECORD_PK_REQUIRED", "type": "validation", "message": "is required (Primary Key)" },
+    { "code": "RECORD_PK_MUST_BE_UNIQUE", "type": "validation", "message": "must be unique (Primary Key)" },
+    { "code": "RECORD_COMPOSITE_PK_UNIQUE", "type": "validation", "message": "composite primary key ({{names}}): must be unique" },
+    { "code": "RECORD_FK_TARGET_NOT_DEPLOYED", "type": "validation", "message": "target model \"{{targetModel}}\" is not deployed" },
+    { "code": "RECORD_FK_NOT_FOUND", "type": "validation", "message": "referenced {{targetModel}} id \"{{id}}\" does not exist" },
+    { "code": "RECORD_REFERENCED", "type": "validation", "message": "cannot delete: {{otherModel}}.{{field}} still references this id ({{count}} record{{plural}})" }
+  ]
+}

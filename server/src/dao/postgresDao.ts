@@ -6,7 +6,7 @@ import type {
   Record as ModelRecord,
   ReferentialAction,
 } from '@modeler/shared';
-import { validateRecord, formatRecord, DEFAULT_ON_DELETE } from '@modeler/shared';
+import { validateRecord, formatRecord, DEFAULT_ON_DELETE, getMessage, MSG } from '@modeler/shared';
 import { Dao, DaoValidationError } from './dao.js';
 import type { DaoRegistry } from './daoRegistry.js';
 import { quoteIdent } from '../db/schema.js';
@@ -292,13 +292,13 @@ export class PostgresDao implements Dao {
       if (val === undefined || val === null || val === '') continue;
       const targetDao = this.registry.get(field.targetModel);
       if (!targetDao) {
-        errors.push(`${field.name}: target model "${field.targetModel}" is not deployed`);
+        errors.push(`${field.name}: ${getMessage(MSG.RECORD_FK_TARGET_NOT_DEPLOYED, { targetModel: field.targetModel })}`);
         continue;
       }
       const exists = await targetDao.get(String(val));
       if (!exists) {
         errors.push(
-          `${field.name}: referenced ${field.targetModel} id "${String(val)}" does not exist`,
+          `${field.name}: ${getMessage(MSG.RECORD_FK_NOT_FOUND, { targetModel: field.targetModel, id: String(val) })}`,
         );
       }
     }
@@ -333,7 +333,7 @@ export class PostgresDao implements Dao {
       sql += softDeleteFilter + ' LIMIT 1';
       const dup = await client.query(sql, params);
       if (dup.rowCount !== null && dup.rowCount > 0) {
-        errors.push(`${f.name}: must be unique`);
+        errors.push(`${f.name}: ${getMessage(MSG.RECORD_MUST_BE_UNIQUE)}`);
       }
     }
 
@@ -345,7 +345,7 @@ export class PostgresDao implements Dao {
         return v === undefined || v === null || v === '';
       });
       if (missingPk.length > 0) {
-        for (const f of missingPk) errors.push(`${f.name}: is required (Primary Key)`);
+        for (const f of missingPk) errors.push(`${f.name}: ${getMessage(MSG.RECORD_PK_REQUIRED)}`);
       } else {
         const params: unknown[] = [];
         const conds: string[] = [];
@@ -362,10 +362,10 @@ export class PostgresDao implements Dao {
         const dup = await client.query(sql, params);
         if (dup.rowCount !== null && dup.rowCount > 0) {
           if (pkFields.length === 1) {
-            errors.push(`${pkFields[0].name}: must be unique (Primary Key)`);
+            errors.push(`${pkFields[0].name}: ${getMessage(MSG.RECORD_PK_MUST_BE_UNIQUE)}`);
           } else {
             const names = pkFields.map((f) => f.name).join(', ');
-            errors.push(`composite primary key (${names}): must be unique`);
+            errors.push(getMessage(MSG.RECORD_COMPOSITE_PK_UNIQUE, { names }));
           }
         }
       }
@@ -408,7 +408,12 @@ export class PostgresDao implements Dao {
       const blockers = await inc.otherDao.listReferencing(inc.field.name, id);
       if (blockers.length > 0) {
         blockErrors.push(
-          `cannot delete: ${inc.otherModel.name}.${inc.field.name} still references this id (${blockers.length} record${blockers.length === 1 ? '' : 's'})`,
+          getMessage(MSG.RECORD_REFERENCED, {
+            otherModel: inc.otherModel.name,
+            field: inc.field.name,
+            count: blockers.length,
+            plural: blockers.length === 1 ? '' : 's',
+          }),
         );
       }
     }
